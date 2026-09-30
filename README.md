@@ -117,13 +117,40 @@ The Paystack checkout redirect relies on the app's `way://` URL scheme
 (already set in `app.json`) — no extra setup needed on the mobile side for
 that to work.
 
-Push notification tokens won't register without an EAS project: run `eas
-init` (needs a free Expo account) to get a `projectId`, then it's picked up
-automatically from `app.json`'s `extra.eas.projectId`. Without it — or in
-Expo Go on SDK 53+, which dropped remote push support entirely, or on a
-simulator/emulator — push registration fails silently and the rest of the
-app keeps working normally; you'll just need a real development build on a
-physical device to see a notification land.
+Push notification tokens need an EAS project to register — this one's
+already linked (`app.json`'s `extra.eas.projectId`, account `@wayapp`,
+`eas.json` has `development`/`preview`/`production` build profiles and
+`expo-dev-client` is installed). What still won't work is testing it in
+Expo Go or a simulator/emulator: Expo Go dropped remote push support on SDK
+53+, and simulators have no real push token, so push registration fails
+silently there (harmlessly — the rest of the app keeps working). You need
+an actual **development build** on a physical device:
+
+```bash
+cd mobile
+npx eas-cli build --platform android --profile development   # no paid account needed
+# or, for iOS: needs an active Apple Developer Program membership ($99/yr)
+# so EAS can sign the build — run this yourself, it prompts for Apple ID login:
+npx eas-cli build --platform ios --profile development
+```
+
+Both run in EAS's cloud and land at `https://expo.dev/accounts/wayapp/projects/way/builds` —
+the CLI also prints a direct link when the build finishes. Install the
+resulting `.apk` (Android — allow "install from unknown sources") or use
+the TestFlight-style install link (iOS), then point it at your dev server:
+
+```bash
+npx expo start --dev-client
+```
+
+Make sure the backend is reachable from the device (same Wi-Fi, with
+`EXPO_PUBLIC_API_URL` set to your machine's LAN IP rather than `localhost`).
+
+To actually see a notification land: push fans out to **followers**, not
+the broadcaster. Create two profiles, have Profile A follow Profile B, then
+switch the active profile to B and go live — A's push token stays
+registered even while B is active, so "B is live now" should arrive on the
+same device.
 
 ## Project conventions
 
