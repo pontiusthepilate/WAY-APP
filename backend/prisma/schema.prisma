@@ -188,6 +188,24 @@ model Transaction {
   @@index([walletId, counterpartyProfileId])
 }
 
+// A real Paystack checkout in flight. Created "pending" when we ask Paystack
+// to open a hosted checkout page, flipped to "success"/"failed" only once
+// /wallet/fund/verify has actually confirmed it with Paystack — the
+// WalletBalance/Transaction credit happens at that point, not before, so a
+// user closing the browser mid-payment can't credit themselves.
+model PaystackPayment {
+  id         String    @id @default(cuid())
+  profileId  String
+  currency   String
+  amount     Int // minor units (kobo for NGN) — what we asked Paystack to charge
+  reference  String    @unique
+  status     String    @default("pending") // "pending" | "success" | "failed"
+  createdAt  DateTime  @default(now())
+  verifiedAt DateTime?
+
+  @@index([profileId])
+}
+
 // A minimal follow graph — exists mainly so "notify my followers" (going
 // live) has someone real to target. Profile.followersCount/followingCount
 // are kept in sync transactionally on follow/unfollow.

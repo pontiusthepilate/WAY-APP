@@ -20,17 +20,17 @@ This repo is a monorepo with two projects:
 - **Timeline/feed** — text, photo, and video posts with like/comment/share/view counts, a global reverse-chronological feed, and a per-profile grid (like an Instagram profile page)
 - **Auto-scroll** via the **WAY Button** — a transparent, teal-ringed floating control on the right-middle edge of the Feed screen; tap it for 3 speed options (slow/medium/fast), tap again to stop. Built as a standalone component so it's easy to promote to an app-wide overlay with more assigned functions later
 - A small **local file-upload endpoint** (`POST /uploads`) backs both post media and WAY Request attachments — see the storage caveat below
-- **Wallet** — multi-currency balances (USD/NGN/EUR/GBP), simulated card funding (no real processor wired up — see caveat below), sending funds to another WAY by ID, a general transaction history, and a history filtered to one specific person. Purchases-within-the-app will reuse this same transfer primitive once there's something to buy
+- **Wallet** — multi-currency balances (USD/NGN/EUR/GBP), sending funds to another WAY by ID, a general transaction history, and a history filtered to one specific person. Purchases-within-the-app will reuse this same transfer primitive once there's something to buy. **Card funding is real for NGN** via Paystack's hosted checkout (see caveat below) — other currencies still use a simulated instant credit
 - **Going live** (feature 15) — schedule or start a broadcast, a "Live Now" rail on the Feed, a real viewer count, real live chat, and a real push notification to followers when you go live or schedule one. The video transport itself is stubbed — viewers get a placeholder, not your camera feed — see caveat below
 - A minimal **follow graph** (follow/unfollow, a Follow button on the search mini-profile) — added specifically so "notify my followers" has someone real to notify; profile follower/following counts are now live instead of static
 - **Remote camera/mic access** (feature 16) — request another profile's camera from their mini-profile; nothing happens until they explicitly accept (a "Request Camera Access" button on the mini-profile, a review screen naming exactly who's asking and why, and a push notification), either party can end an active session, and the request/session detail endpoints are restricted to the two people involved. Video transport is stubbed the same way as Going Live — see caveat below
 
 ## Not built yet (from the full spec)
 
-Real payment processing (card or crypto), real live video transport,
-followers/subscribers/one-time-access tiers, and video editing/cropping
-tools beyond the request flow's 5-second camera cap. These are substantial
-features best scoped as their own follow-ups.
+Crypto funding, real live video transport, followers/subscribers/one-time-
+access tiers, and video editing/cropping tools beyond the request flow's
+5-second camera cap. These are substantial features best scoped as their
+own follow-ups.
 
 ## Prerequisites
 
@@ -59,13 +59,27 @@ dev and a single-server deploy, but it won't survive redeploys or scale past
 one instance — swap `src/routes/uploads.ts` for S3/Cloudinary/R2 before
 shipping.
 
-Wallet funding is entirely simulated (`POST /wallet/fund` with `method:
-"card"` just credits the balance — no card details are ever collected, so
-there's nothing PCI-sensitive here yet). Before real money moves, swap it for
-a real processor's server SDK (Stripe, Paystack, etc.) behind that same
-endpoint; `method: "crypto"` already returns a 501 placeholder for whichever
-on/off-ramp gets picked later. Transfers between wallets and the balance
-ledger itself are real — only the funding source is fake.
+Card funding (`POST /wallet/fund` with `method: "card"`) is real for NGN via
+[Paystack](https://paystack.com)'s hosted checkout — set `PAYSTACK_SECRET_KEY`
+in `.env` (a **test** secret key from your Paystack dashboard is fine and
+recommended while developing) and it activates automatically; leave it unset
+and NGN funding falls back to the same instant simulated credit every other
+currency still uses (see `PAYSTACK_SUPPORTED_CURRENCIES` in
+`src/lib/paystack.ts` — Paystack accounts are approved for specific
+currencies by business country, so this stays NGN-only until there's a
+reason to widen it). The flow: the backend calls Paystack's Initialize
+Transaction API and hands the mobile app a checkout URL; the app opens it via
+`expo-web-browser`, Paystack redirects back to the app's `way://` scheme on
+completion, and the app then calls `POST /wallet/fund/verify` — which
+independently re-checks the payment with Paystack's server-to-server Verify
+API before crediting anything. **The redirect itself is never trusted as
+proof of payment; only that server-to-server verify is.** No card details
+ever touch this backend — Paystack's checkout page collects them directly,
+so there's nothing PCI-sensitive here. `method: "crypto"` still returns a
+501 placeholder for whichever on/off-ramp gets picked later. Transfers
+between wallets and the balance ledger itself have been real since the
+wallet was first built — this pass only replaced the funding *source* for
+NGN.
 
 Live video (both the Going Live broadcast and remote camera/mic sessions) is
 scheduling/consent + presence + chat, not actual video — real streaming
@@ -98,6 +112,10 @@ Android emulator needs your machine's LAN IP.
 The real WAY logo, app icon, and brand colors (from `Way Brand Guide.pdf`) are
 wired in — deep teal `#0A4554` primary, `#2F6F7C` secondary, `#E6B655` gold /
 `#F26A5B` coral accents, and the Gabarito headline typeface.
+
+The Paystack checkout redirect relies on the app's `way://` URL scheme
+(already set in `app.json`) — no extra setup needed on the mobile side for
+that to work.
 
 Push notification tokens won't register without an EAS project: run `eas
 init` (needs a free Expo account) to get a `projectId`, then it's picked up

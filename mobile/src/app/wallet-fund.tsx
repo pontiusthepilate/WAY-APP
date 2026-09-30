@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
-import { fundWallet } from "../api/wallet";
+import { fundWallet, verifyFunding } from "../api/wallet";
 import { toMinorUnits } from "../lib/formatCurrency";
 import { CURRENCIES, type Currency } from "../types";
 import { ApiError } from "../api/client";
@@ -12,6 +13,12 @@ const METHODS: { key: "card" | "crypto"; label: string }[] = [
   { key: "card", label: "Card" },
   { key: "crypto", label: "Crypto" },
 ];
+
+// Real card funding (Paystack) is only live for NGN right now — see
+// backend/src/lib/paystack.ts. Other currencies still use the simulated
+// instant-credit path the backend falls back to automatically.
+const REAL_FUNDING_CURRENCIES: Currency[] = ["NGN"];
+const PAYSTACK_REDIRECT_URL = "way://wallet-fund-callback";
 
 export default function WalletFundScreen() {
   const router = useRouter();
@@ -24,14 +31,35 @@ export default function WalletFundScreen() {
 
   const parsedAmount = parseFloat(amount);
   const isValid = !Number.isNaN(parsedAmount) && parsedAmount > 0;
+  const isRealFunding = method === "card" && REAL_FUNDING_CURRENCIES.includes(currency);
 
   async function handleFund() {
     if (!activeProfile || !isValid) return;
     setLoading(true);
     setError(null);
     try {
-      await fundWallet({ profileId: activeProfile.id, currency, amount: toMinorUnits(parsedAmount), method });
-      router.back();
+      const result = await fundWallet({ profileId: activeProfile.id, currency, amount: toMinorUnits(parsedAmount), method });
+
+      if (result.status === "completed") {
+        router.back();
+        return;
+      }
+
+      // requires_action: open Paystack's hosted checkout and wait for it to
+      // redirect back to our app scheme, then confirm with our own server —
+      // the redirect alone is never trusted as proof of payment.
+      const browserResult = await WebBrowser.openAuthSessionAsync(result.authorizationUrl, PAYSTACK_REDIRECT_URL);
+      if (browserResult.type !== "success") {
+        setError("Payment was cancelled.");
+        return;
+      }
+
+      const verified = await verifyFunding({ profileId: activeProfile.id, reference: result.reference });
+      if (verified.status === "completed") {
+        router.back();
+      } else {
+        setError(verified.error || "Payment was not successful.");
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 501) {
         setError("Crypto funding is coming soon — use Card for now.");
@@ -77,6 +105,11 @@ export default function WalletFundScreen() {
       {method === "crypto" && (
         <Text style={styles.notice}>Crypto funding is coming soon. You can still fund with a card today.</Text>
       )}
+      {method === "card" && !isRealFunding && (
+        <Text style={styles.notice}>
+          Real card funding is live for NGN. {currency} still uses a simulated top-up for now.
+        </Text>
+      )}
 
       {error && <Text style={styles.error}>{error}</Text>}
 
@@ -85,7 +118,9 @@ export default function WalletFundScreen() {
       </Pressable>
 
       <Text style={styles.footnote}>
-        This is a simulated top-up for testing — no real payment is charged yet.
+        {isRealFunding
+          ? "You'll complete payment on Paystack's secure checkout page."
+          : "This is a simulated top-up for testing — no real payment is charged yet."}
       </Text>
     </View>
   );

@@ -12,8 +12,19 @@ export function getWallet(profileId: string) {
   return api.get<{ walletId: string; balances: WalletBalance[] }>(`/wallet${qs({ profileId })}`);
 }
 
+export type FundResult =
+  | { status: "completed"; balance: WalletBalance; transaction: Transaction }
+  | { status: "requires_action"; authorizationUrl: string; reference: string };
+
 export function fundWallet(input: { profileId: string; currency: Currency; amount: number; method: "card" | "crypto" }) {
-  return api.post<{ balance: WalletBalance; transaction: Transaction }>("/wallet/fund", input);
+  return api.post<FundResult>("/wallet/fund", input);
+}
+
+export function verifyFunding(input: { profileId: string; reference: string }) {
+  return api.post<{ status: "completed"; balance: WalletBalance } | { status: "failed"; error: string }>(
+    "/wallet/fund/verify",
+    input
+  );
 }
 
 export function transferFunds(input: { fromProfileId: string; toWayId: string; currency: Currency; amount: number; note?: string }) {

@@ -5,6 +5,12 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { ALLOWED_CURRENCIES, isAllowedCurrency } from "../lib/currency";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
+import {
+  PAYSTACK_SUPPORTED_CURRENCIES,
+  initializeTransaction,
+  isPaystackConfigured,
+  verifyTransaction,
+} from "../lib/paystack";
 
 const currencySchema = z.string().refine(isAllowedCurrency, {
   message: `Currency must be one of: ${ALLOWED_CURRENCIES.join(", ")}`,
@@ -33,8 +39,32 @@ const historyQuery = z.object({
   withWayId: z.string().optional(),
 });
 
+const verifyFundBody = z.object({ profileId: z.string(), reference: z.string() });
+
 async function getOrCreateWallet(profileId: string) {
   return prisma.wallet.upsert({ where: { profileId }, create: { profileId }, update: {} });
+}
+
+// Paystack requires an email on every transaction. Profiles aren't required
+// to have one (phone-only signup is supported), so this falls back to a
+// synthesized address — never shown to the user, only sent to Paystack.
+async function resolveEmailForProfile(profile: { id: string; userId: string; wayId: string }): Promise<string> {
+  const user = await prisma.user.findUnique({ where: { id: profile.userId } });
+  return user?.email ?? `${profile.wayId}@way-user.app`;
+}
+
+async function creditWallet(profileId: string, currency: string, amount: number, method: "card") {
+  const wallet = await getOrCreateWallet(profileId);
+  const groupId = randomUUID();
+  const [balance, transaction] = await prisma.$transaction([
+    prisma.walletBalance.upsert({
+      where: { walletId_currency: { walletId: wallet.id, currency } },
+      create: { walletId: wallet.id, currency, amount },
+      update: { amount: { increment: amount } },
+    }),
+    prisma.transaction.create({ data: { walletId: wallet.id, groupId, type: "fund", currency, amount, method } }),
+  ]);
+  return { balance: { currency: balance.currency, amount: balance.amount }, transaction };
 }
 
 async function withCounterparties<T extends { counterpartyProfileId: string | null }>(rows: T[]) {
@@ -57,39 +87,82 @@ export async function walletRoutes(app: FastifyInstance) {
     reply.send({ walletId: wallet.id, balances: balances.map((b) => ({ currency: b.currency, amount: b.amount })) });
   });
 
-  // Simulated funding — no real card/crypto processor wired up yet (see README).
-  // "card" completes instantly; "crypto" is a stubbed coming-soon path.
+  // "crypto" is a stubbed coming-soon path. "card" is real for NGN when
+  // PAYSTACK_SECRET_KEY is configured (returns a checkout URL to open and
+  // requires a follow-up call to /wallet/fund/verify); otherwise it falls
+  // back to an instant simulated credit, same as before Paystack existed.
   app.post("/wallet/fund", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { userId } = requireUser(req);
     const body = fundBody.parse(req.body);
-    await assertOwnsProfile(userId, body.profileId);
+    const profile = await assertOwnsProfile(userId, body.profileId);
 
     if (body.method === "crypto") {
       return reply.status(501).send({ error: "Crypto funding is coming soon" });
     }
 
-    const wallet = await getOrCreateWallet(body.profileId);
-    const groupId = randomUUID();
+    const paystackEligible =
+      isPaystackConfigured() && (PAYSTACK_SUPPORTED_CURRENCIES as readonly string[]).includes(body.currency);
 
-    const [balance, transaction] = await prisma.$transaction([
-      prisma.walletBalance.upsert({
-        where: { walletId_currency: { walletId: wallet.id, currency: body.currency } },
-        create: { walletId: wallet.id, currency: body.currency, amount: body.amount },
-        update: { amount: { increment: body.amount } },
-      }),
-      prisma.transaction.create({
-        data: {
-          walletId: wallet.id,
-          groupId,
-          type: "fund",
-          currency: body.currency,
+    if (paystackEligible) {
+      const reference = `way_${randomUUID()}`;
+      await prisma.paystackPayment.create({
+        data: { profileId: profile.id, currency: body.currency, amount: body.amount, reference },
+      });
+
+      try {
+        const email = await resolveEmailForProfile(profile);
+        const { authorizationUrl } = await initializeTransaction({
+          email,
           amount: body.amount,
-          method: "card",
-        },
-      }),
-    ]);
+          currency: body.currency,
+          reference,
+          callbackUrl: process.env.PAYSTACK_CALLBACK_URL ?? "way://wallet-fund-callback",
+        });
+        return reply.status(202).send({ status: "requires_action", authorizationUrl, reference });
+      } catch (err) {
+        await prisma.paystackPayment.update({ where: { reference }, data: { status: "failed" } });
+        return reply.status(502).send({ error: err instanceof Error ? err.message : "Could not start payment" });
+      }
+    }
 
-    reply.status(201).send({ balance: { currency: balance.currency, amount: balance.amount }, transaction });
+    const result = await creditWallet(body.profileId, body.currency, body.amount, "card");
+    reply.status(201).send({ status: "completed", ...result });
+  });
+
+  // Confirms a Paystack checkout actually succeeded before crediting anything
+  // — the checkout redirect alone is never trusted, since a client could
+  // forge a "success" callback without this server-to-server check.
+  app.post("/wallet/fund/verify", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { userId } = requireUser(req);
+    const body = verifyFundBody.parse(req.body);
+    const profile = await assertOwnsProfile(userId, body.profileId);
+
+    const payment = await prisma.paystackPayment.findUnique({ where: { reference: body.reference } });
+    if (!payment || payment.profileId !== profile.id) return reply.status(404).send({ error: "Not found" });
+
+    if (payment.status === "success") {
+      const wallet = await getOrCreateWallet(profile.id);
+      const balance = await prisma.walletBalance.findUnique({
+        where: { walletId_currency: { walletId: wallet.id, currency: payment.currency } },
+      });
+      return reply.send({ status: "completed", balance: balance ?? { currency: payment.currency, amount: 0 } });
+    }
+    // A "payment didn't succeed" answer is itself a successful verification
+    // call — this stays 200, not an error status, so the client can branch
+    // on `status` in the body instead of catching an exception for it.
+    if (payment.status === "failed") {
+      return reply.send({ status: "failed", error: "Payment was not successful" });
+    }
+
+    const result = await verifyTransaction(body.reference);
+    if (!result.success || result.amount !== payment.amount || result.currency !== payment.currency) {
+      await prisma.paystackPayment.update({ where: { id: payment.id }, data: { status: "failed", verifiedAt: new Date() } });
+      return reply.send({ status: "failed", error: result.gatewayResponse || "Payment was not successful" });
+    }
+
+    const credited = await creditWallet(profile.id, payment.currency, payment.amount, "card");
+    await prisma.paystackPayment.update({ where: { id: payment.id }, data: { status: "success", verifiedAt: new Date() } });
+    reply.send({ status: "completed", ...credited });
   });
 
   app.post("/wallet/transfer", { onRequest: [app.authenticate] }, async (req, reply) => {
