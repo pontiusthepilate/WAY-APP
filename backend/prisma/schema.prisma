@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// The parent/key identity: a verified phone number or email.
+// A User can hold multiple Profiles (2 free on signup).
+model User {
+  id        String   @id @default(cuid())
+  phone     String?  @unique
+  email     String?  @unique
+  createdAt DateTime @default(now())
+
+  profiles Profile[]
+}
+
+// Short-lived verification code sent to a phone or email during sign up / sign in.
+model OtpCode {
+  id         String   @id @default(cuid())
+  identifier String // phone number or email this code was sent to
+  code       String
+  expiresAt  DateTime
+  consumed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+}
+
+// A single WAY identity (WAY-ID). Each User gets 2 free profiles and can run
+// them independently, e.g. a personal profile and a business profile.
+model Profile {
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id])
+  wayId       String  @unique // the handle people search for / ask for socially as "your WAY"
+  displayName String
+  displayPictureUrl String?
+  bio         String?
+  categories  String[] @default([]) // interests / category tags used for search filtering
+  kind        String   @default("personal") // free-form label, e.g. "personal" | "business"
+  isVerified  Boolean  @default(false)
+
+  followersCount Int @default(0)
+  followingCount Int @default(0)
+
+  // Visibility controls (feature 4): a profile can be found on none, some, or all
+  // search modes, and can carry a visibility text/image shown in its mini-profile.
+  isVisible          Boolean @default(true)
+  visibleToNearby    Boolean @default(true)
+  visibleToAddress   Boolean @default(true)
+  visibleToLocation  Boolean @default(true)
+  visibilityText     String?
+  visibilityImageUrl String?
+
+  // Location (feature 5): a profile's displayed location can be overridden to
+  // anywhere on earth; actualLat/actualLng always hold the real device location.
+  actualLat            Float?
+  actualLng            Float?
+  displayLat           Float?
+  displayLng           Float?
+  isLocationOverridden Boolean @default(false)
+  lastActiveAt         DateTime?
+
+  // Kept in sync with displayLat/displayLng via raw SQL on write; used for
+  // fast radius search with PostGIS (ST_DWithin / ST_Distance / ST_Azimuth).
+  location Unsupported("geography(Point, 4326)")?
+
+  createdAt DateTime @default(now())
+
+  posts  Post[]
+  wallet Wallet?
+
+  pushTokens   PushToken[]
+  liveSessions LiveSession[]
+
+  @@index([userId])
+}
+
+// A connection request sent from one profile to another after finding them
+// through search (feature 2). Media is a URL into object storage — uploading
+// the file there is a separate concern from this record.
+model WayRequest {
+  id             String   @id @default(cuid())
+  fromProfileId  String
+  toProfileId    String
+  text           String?
+  mediaUrl       String?
+  mediaType      String? // "image" | "video"
+  status         String   @default("pending") // pending | accepted | declined
+  createdAt      DateTime @default(now())
+
+  @@index([fromProfileId])
+  @@index([toProfileId])
+}
+
+// A timeline post (feature: profile timeline). Text-only, image, or video —
+// mediaUrl points into object storage, same caveat as WayRequest.mediaUrl.
+model Post {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id])
+  type          String // "text" | "image" | "video"
+  mediaUrl      String?
+  caption       String?
+  likesCount    Int      @default(0)
+  commentsCount Int      @default(0)
+  sharesCount   Int      @default(0)
+  viewsCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  likes    Like[]
+  comments Comment[]
+
+  @@index([profileId, createdAt])
+  @@index([createdAt])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  profileId String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, profileId])
+  @@index([profileId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  profileId String
+  text      String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+}
+
+// One wallet per profile (not per user) — profiles run independently
+// everywhere else in the app, so their finances stay separate too.
+model Wallet {
+  id        String   @id @default(cuid())
+  profileId String   @unique
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  createdAt DateTime @default(now())
+
+  balances     WalletBalance[]
+  transactions Transaction[]
+}
+
+// A wallet can hold a balance in several currencies at once (feature: no
+// auto-conversion — funding and sending both happen in a single currency).
+model WalletBalance {
+  id       String @id @default(cuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id])
+  currency String // ISO 4217 code, see lib/currency.ts ALLOWED_CURRENCIES
+  amount   Int    @default(0) // minor units (cents/kobo) — never a float
+
+  @@unique([walletId, currency])
+}
+
+// One row per wallet per side of an event: a transfer writes two rows (one
+// "transfer_out" on the sender's wallet, one "transfer_in" on the
+// receiver's), sharing groupId, so "history with this specific person" is
+// just a filter on counterpartyProfileId.
+model Transaction {
+  id                 String   @id @default(cuid())
+  walletId           String
+  wallet             Wallet   @relation(fields: [walletId], references: [id])
+  groupId            String // links the two legs of a transfer; unique per fund
+  type               String // "fund" | "transfer_out" | "transfer_in"
+  currency           String
+  amount             Int // minor units, always positive — sign is implied by type
+  counterpartyProfileId String?
+  method             String? // for type "fund": "card" | "crypto"
+  description        String?
+  createdAt          DateTime @default(now())
+
+  @@index([walletId, createdAt])
+  @@index([walletId, counterpartyProfileId])
+}
+
+// A minimal follow graph — exists mainly so "notify my followers" (going
+// live) has someone real to target. Profile.followersCount/followingCount
+// are kept in sync transactionally on follow/unfollow.
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+// One Expo push token per (profile, device). A profile registers its
+// device's token while signed in; "notify followers" fans out to every
+// token belonging to every profile that follows the broadcaster.
+model PushToken {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  token     String
+  createdAt DateTime @default(now())
+
+  @@unique([profileId, token])
+}
+
+// A go-live broadcast (feature 15). The video transport itself is stubbed —
+// see README — but scheduling, status, viewer count, and chat are all real.
+model LiveSession {
+  id           String    @id @default(cuid())
+  profileId    String
+  profile      Profile   @relation(fields: [profileId], references: [id])
+  title        String?
+  status       String    @default("scheduled") // "scheduled" | "live" | "ended"
+  scheduledFor DateTime?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  viewerCount  Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  chatMessages LiveChatMessage[]
+
+  @@index([status])
+  @@index([profileId, createdAt])
+}
+
+model LiveChatMessage {
+  id            String      @id @default(cuid())
+  liveSessionId String
+  liveSession   LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+  profileId     String
+  text          String
+  createdAt     DateTime    @default(now())
+
+  @@index([liveSessionId, createdAt])
+}
+
+// A request to remotely activate another profile's camera/mic (feature 16 —
+// e.g. a journalist asking a witness to point their camera at something).
+// Nothing streams until the target explicitly accepts; accepting creates a
+// RemoteCameraSession. The target can end that session at any time.
+model RemoteCameraRequest {
+  id          String    @id @default(cuid())
+  fromProfileId String  // wants to view the stream
+  toProfileId   String  // owns the camera being asked for
+  message     String?
+  status      String    @default("pending") // "pending" | "accepted" | "declined"
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  @@index([toProfileId, status])
+  @@index([fromProfileId])
+}
+
+model RemoteCameraSession {
+  id            String    @id @default(cuid())
+  requestId     String    @unique
+  granterId     String // the camera owner — the only one actually broadcasting
+  requesterId   String // the viewer
+  status        String    @default("active") // "active" | "ended"
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+
+  @@index([granterId, status])
+  @@index([requesterId, status])
+}
