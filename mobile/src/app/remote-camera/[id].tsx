@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { endCameraSession, getCameraSession } from "../../api/remoteCamera";
+import { safeBack } from "../../lib/navigation";
 import type { RemoteCameraSession } from "../../types";
 
 export default function RemoteCameraSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState<RemoteCameraSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function RemoteCameraSessionScreen() {
   async function handleEnd() {
     if (!id || !activeProfile) return;
     await endCameraSession(id, activeProfile.id);
-    router.back();
+    safeBack();
   }
 
   if (loading || !session) {
@@ -48,7 +50,7 @@ export default function RemoteCameraSessionScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.endedText}>This session has ended.</Text>
-        <Pressable style={styles.doneButton} onPress={() => router.back()}>
+        <Pressable style={styles.doneButton} onPress={() => safeBack()}>
           <Text style={styles.doneButtonText}>Back</Text>
         </Pressable>
       </View>
@@ -84,13 +86,13 @@ export default function RemoteCameraSessionScreen() {
           </View>
         )}
 
-        <View style={styles.overlayTop}>
+        <View style={[styles.overlayTop, { top: spacing.lg + insets.top }]}>
           <View style={styles.liveTag}>
             <Text style={styles.liveTagText}>{isGranter ? "● SHARING" : "● CONNECTED"}</Text>
           </View>
         </View>
 
-        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+        <Pressable style={[styles.closeButton, { top: spacing.lg + insets.top }]} onPress={() => safeBack()}>
           <Text style={styles.closeButtonText}>✕</Text>
         </Pressable>
       </View>

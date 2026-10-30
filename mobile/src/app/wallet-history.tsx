@@ -1,15 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { TransactionRow } from "../components/TransactionRow";
 import { useSession } from "../context/SessionContext";
 import { getTransactions } from "../api/wallet";
+import { safeBack } from "../lib/navigation";
+import { SkyOceanBackground } from "../components/SkyOceanBackground";
 import type { Transaction } from "../types";
 
 export default function WalletHistoryScreen() {
-  const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [filterWayId, setFilterWayId] = useState("");
   const [appliedFilter, setAppliedFilter] = useState<string | undefined>(undefined);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -61,8 +64,9 @@ export default function WalletHistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Pressable onPress={() => router.back()}>
+      <SkyOceanBackground tone="pale" />
+      <View style={[styles.headerRow, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack("/wallet")}>
           <Text style={styles.back}>‹ Back</Text>
         </Pressable>
         <Text style={styles.title}>Transaction History</Text>
@@ -71,6 +75,7 @@ export default function WalletHistoryScreen() {
 
       <View style={styles.filterRow}>
         <View style={styles.wayInputWrap}>
+          <Ionicons name="at-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
           <Text style={styles.wayPrefix}>WAY/</Text>
           <TextInput
             style={styles.wayInput}
@@ -85,10 +90,12 @@ export default function WalletHistoryScreen() {
         {appliedFilter ? (
           <Pressable style={styles.clearButton} onPress={clearFilter}>
             <Text style={styles.clearButtonText}>Clear</Text>
+            <Ionicons name="close-outline" size={16} color={colors.textSecondary} />
           </Pressable>
         ) : (
           <Pressable style={styles.filterButton} onPress={applyFilter}>
             <Text style={styles.filterButtonText}>Filter</Text>
+            <Ionicons name="funnel-outline" size={16} color={colors.textOnPrimary} />
           </Pressable>
         )}
       </View>
@@ -113,7 +120,7 @@ export default function WalletHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -131,15 +138,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
   },
+  inputIcon: { marginRight: spacing.xs },
   wayPrefix: { ...typography.body, color: colors.primaryDark, fontWeight: "700" },
   wayInput: { flex: 1, paddingVertical: spacing.sm, ...typography.body, color: colors.textPrimary },
-  filterButton: { backgroundColor: colors.primary, borderRadius: radii.md, paddingHorizontal: spacing.md, justifyContent: "center" },
+  filterButton: {
+    flexDirection: "row",
+    gap: 4,
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   filterButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
-  clearButton: { backgroundColor: colors.surfaceAlt, borderRadius: radii.md, paddingHorizontal: spacing.md, justifyContent: "center" },
+  clearButton: {
+    flexDirection: "row",
+    gap: 4,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: "rgba(16, 42, 49, 0.12)",
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   clearButtonText: { color: colors.textSecondary, fontWeight: "700" },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
   spinner: { marginVertical: spacing.lg },

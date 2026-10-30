@@ -10,18 +10,22 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { PostCard } from "../../components/PostCard";
 import { useSession } from "../../context/SessionContext";
 import { addComment, getComments, getPost } from "../../api/posts";
+import { safeBack } from "../../lib/navigation";
 import type { Comment, Post } from "../../types";
 import { formatRelativeTime } from "../../lib/formatRelativeTime";
+import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -63,6 +67,7 @@ export default function PostDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
+        <SkyOceanBackground tone="pale" />
         <ActivityIndicator color={colors.primaryDark} />
       </View>
     );
@@ -71,6 +76,7 @@ export default function PostDetailScreen() {
   if (!post) {
     return (
       <View style={styles.centered}>
+        <SkyOceanBackground tone="pale" />
         <Text style={styles.empty}>Post not found.</Text>
       </View>
     );
@@ -82,8 +88,9 @@ export default function PostDetailScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={90}
     >
-      <View style={styles.headerRow}>
-        <Pressable onPress={() => router.back()}>
+      <SkyOceanBackground tone="pale" />
+      <View style={[styles.headerRow, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()}>
           <Text style={styles.back}>‹ Back</Text>
         </Pressable>
         <Text style={styles.title}>Post</Text>
@@ -105,15 +112,25 @@ export default function PostDetailScreen() {
       />
 
       <View style={styles.composerRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Add a comment…"
-          placeholderTextColor={colors.textSecondary}
-          value={draft}
-          onChangeText={setDraft}
-        />
+        <View style={styles.inputWrap}>
+          <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Add a comment…"
+            placeholderTextColor={colors.textSecondary}
+            value={draft}
+            onChangeText={setDraft}
+          />
+        </View>
         <Pressable style={styles.sendButton} onPress={handleSend} disabled={sending || !draft.trim()}>
-          {sending ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.sendButtonText}>Send</Text>}
+          {sending ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <>
+              <Text style={styles.sendButtonText}>Send</Text>
+              <Ionicons name="paper-plane-outline" size={16} color={colors.textOnPrimary} />
+            </>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -121,8 +138,8 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  container: { flex: 1 },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -146,17 +163,29 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  input: {
+  inputWrap: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: "rgba(16, 42, 49, 0.08)",
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
+  },
+  inputIcon: { marginRight: spacing.xs },
+  input: {
+    flex: 1,
     paddingVertical: spacing.sm,
     ...typography.body,
     color: colors.textPrimary,
   },
   sendButton: {
+    flexDirection: "row",
+    gap: 4,
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     alignItems: "center",

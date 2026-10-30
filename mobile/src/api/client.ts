@@ -28,7 +28,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // Only declare JSON when a body is actually being sent — Fastify's
+      // JSON parser rejects a request that has this header but zero bytes
+      // of body (e.g. every no-payload POST like /view, /join, /end).
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },

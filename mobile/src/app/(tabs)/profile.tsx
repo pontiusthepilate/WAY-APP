@@ -7,7 +7,9 @@ import { useSession } from "../../context/SessionContext";
 import { getProfilePosts } from "../../api/posts";
 import { getScheduledLiveSessions, startLiveSession } from "../../api/live";
 import { getIncomingCameraRequests } from "../../api/remoteCamera";
-import type { LiveSession, Post, RemoteCameraRequest } from "../../types";
+import { getIncomingWayRequests } from "../../api/wayRequests";
+import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import type { LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../types";
 
 const COLUMNS = 3;
 const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
@@ -15,21 +17,29 @@ const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
 export default function ProfileScreen() {
   const router = useRouter();
   const { activeProfile, profiles, setActiveProfileId, signOut } = useSession();
+
+  async function handleSignOut() {
+    await signOut();
+    router.replace("/welcome");
+  }
   const [posts, setPosts] = useState<Post[]>([]);
   const [scheduled, setScheduled] = useState<LiveSession[]>([]);
   const [cameraRequests, setCameraRequests] = useState<RemoteCameraRequest[]>([]);
+  const [wayRequests, setWayRequests] = useState<WayRequest[]>([]);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
     try {
-      const [page, upcoming, incoming] = await Promise.all([
-        getProfilePosts(activeProfile.id, { viewerProfileId: activeProfile.id, limit: 60 }),
+      const [page, upcoming, incomingCamera, incomingWay] = await Promise.all([
+        getProfilePosts(activeProfile.id, { viewerProfileId: activeProfile.id, limit: 50 }).catch(() => ({ posts: [], nextCursor: null })),
         getScheduledLiveSessions(activeProfile.id).catch(() => []),
         getIncomingCameraRequests(activeProfile.id).catch(() => []),
+        getIncomingWayRequests(activeProfile.id).catch(() => []),
       ]);
       setPosts(page.posts);
       setScheduled(upcoming);
-      setCameraRequests(incoming.filter((r) => r.status === "pending"));
+      setCameraRequests(incomingCamera.filter((r) => r.status === "pending"));
+      setWayRequests(incomingWay.filter((r) => r.status === "pending"));
     } catch {
       setPosts([]);
     }
@@ -49,8 +59,11 @@ export default function ProfileScreen() {
   if (!activeProfile) return null;
 
   return (
-    <FlatList
+    <View style={styles.root}>
+      <SkyOceanBackground tone="pale" />
+      <FlatList
       style={styles.container}
+      contentContainerStyle={styles.listPadding}
       data={posts}
       keyExtractor={(p) => p.id}
       numColumns={COLUMNS}
@@ -113,6 +126,27 @@ export default function ProfileScreen() {
             </View>
           )}
 
+          {wayRequests.length > 0 && (
+            <View style={styles.upcomingSection}>
+              <Text style={styles.sectionTitle}>WAY Requests</Text>
+              {wayRequests.map((r) => (
+                <Pressable
+                  key={r.id}
+                  style={styles.upcomingRow}
+                  onPress={() => router.push(`/way-request/${r.id}`)}
+                >
+                  <View style={styles.upcomingInfo}>
+                    <Text style={styles.upcomingTitle}>{r.fromProfile?.displayName ?? "Someone"} sent a WAY request</Text>
+                    <Text style={styles.upcomingTime}>{r.text ?? "Tap to review"}</Text>
+                  </View>
+                  <View style={styles.startButton}>
+                    <Text style={styles.startButtonText}>Review</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
           {cameraRequests.length > 0 && (
             <View style={styles.upcomingSection}>
               <Text style={styles.sectionTitle}>Camera Requests</Text>
@@ -141,7 +175,7 @@ export default function ProfileScreen() {
             <Pressable style={[styles.actionButton, styles.goLiveButton]} onPress={() => router.push("/go-live")}>
               <Text style={styles.actionButtonText}>Go Live</Text>
             </Pressable>
-            <Pressable style={[styles.actionButton, styles.signOutButton]} onPress={signOut}>
+            <Pressable style={[styles.actionButton, styles.signOutButton]} onPress={handleSignOut}>
               <Text style={styles.signOutText}>Sign out</Text>
             </Pressable>
           </View>
@@ -151,7 +185,8 @@ export default function ProfileScreen() {
         <PostGridItem post={item} size={TILE_SIZE} onPress={() => router.push(`/post/${item.id}`)} />
       )}
       ListEmptyComponent={<Text style={styles.empty}>No posts yet — tap New Post to share something.</Text>}
-    />
+      />
+    </View>
   );
 }
 
@@ -165,7 +200,9 @@ function Stat({ label, value }: { label: string; value: number }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1 },
+  container: { flex: 1 },
+  listPadding: { paddingBottom: 90 },
   header: { alignItems: "center", paddingTop: spacing.xl, paddingHorizontal: spacing.lg },
   avatar: { width: 88, height: 88, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
   avatarFallback: { alignItems: "center", justifyContent: "center" },

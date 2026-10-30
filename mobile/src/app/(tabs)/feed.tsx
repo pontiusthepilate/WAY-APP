@@ -5,6 +5,7 @@ import { colors, spacing, typography } from "../../theme/theme";
 import { PostCard } from "../../components/PostCard";
 import { WayButton } from "../../components/WayButton";
 import { LiveRail } from "../../components/LiveRail";
+import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { useSession } from "../../context/SessionContext";
 import { useAutoScroll } from "../../lib/useAutoScroll";
 import { getFeed } from "../../api/posts";
@@ -74,6 +75,7 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
+      <SkyOceanBackground tone="pale" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>WAY</Text>
         <View style={styles.headerButtons}>
@@ -106,7 +108,7 @@ export default function FeedScreen() {
         onRefresh={handleRefresh}
         ListEmptyComponent={!error ? <Text style={styles.empty}>No posts yet — be the first to share something.</Text> : null}
         ListFooterComponent={loading ? <ActivityIndicator color={colors.primaryDark} style={styles.spinner} /> : null}
-        contentContainerStyle={posts.length === 0 ? styles.emptyContainer : undefined}
+        contentContainerStyle={[styles.listPadding, posts.length === 0 && styles.emptyContainer]}
       />
 
       <WayButton speed={speed} onChange={setSpeed} />
@@ -115,7 +117,7 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -143,5 +145,8 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", ...typography.caption, marginBottom: spacing.xs },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+  // Clears the floating, transparent tab bar (see (tabs)/_layout.tsx) so the
+  // last post isn't hidden underneath it.
+  listPadding: { paddingBottom: 90 },
   spinner: { marginVertical: spacing.lg },
 });

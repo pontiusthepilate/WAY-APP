@@ -10,7 +10,15 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primaryDark,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        // Transparent + floating so each tab's own SkyOceanBackground shows
+        // straight through to the bottom edge instead of stopping at a
+        // bordered white bar.
+        tabBarStyle: {
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+          position: "absolute",
+        },
       }}
     >
       <Tabs.Screen

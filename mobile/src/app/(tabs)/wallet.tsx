@@ -7,6 +7,7 @@ import { useSession } from "../../context/SessionContext";
 import { getTransactions, getWallet } from "../../api/wallet";
 import type { Transaction, WalletBalance } from "../../types";
 import { formatCurrency } from "../../lib/formatCurrency";
+import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 
 export default function WalletScreen() {
   const router = useRouter();
@@ -33,8 +34,11 @@ export default function WalletScreen() {
   if (!activeProfile) return null;
 
   return (
-    <FlatList
+    <View style={styles.root}>
+      <SkyOceanBackground tone="pale" />
+      <FlatList
       style={styles.container}
+      contentContainerStyle={styles.listPadding}
       data={recent}
       keyExtractor={(t) => t.id}
       renderItem={({ item }) => <TransactionRow tx={item} />}
@@ -80,12 +84,15 @@ export default function WalletScreen() {
         </View>
       }
       ListEmptyComponent={<Text style={styles.empty}>No transactions yet.</Text>}
-    />
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1 },
+  container: { flex: 1 },
+  listPadding: { paddingBottom: 90 },
   headerTitle: { ...typography.h1, color: colors.primaryDark, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   balanceRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm },
   balanceCard: {

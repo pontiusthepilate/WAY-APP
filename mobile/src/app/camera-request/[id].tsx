@@ -6,6 +6,7 @@ import { useSession } from "../../context/SessionContext";
 import { acceptCameraRequest, declineCameraRequest, getCameraRequest } from "../../api/remoteCamera";
 import type { RemoteCameraRequest } from "../../types";
 import { formatRelativeTime } from "../../lib/formatRelativeTime";
+import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 
 export default function CameraRequestScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -54,6 +55,7 @@ export default function CameraRequestScreen() {
   if (loading || !request) {
     return (
       <View style={styles.centered}>
+        <SkyOceanBackground tone="pale" />
         <ActivityIndicator color={colors.primaryDark} />
       </View>
     );
@@ -61,6 +63,7 @@ export default function CameraRequestScreen() {
 
   return (
     <View style={styles.container}>
+      <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Camera Access Request</Text>
       <Text style={styles.subtitle}>
         {request.fromProfile?.displayName ?? "Someone"} (WAY/{request.fromProfile?.wayId}) wants to see your camera
@@ -105,8 +108,8 @@ export default function CameraRequestScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  container: { flex: 1, padding: spacing.xl },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { ...typography.h2, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   time: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },

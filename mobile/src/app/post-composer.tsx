@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { createPost } from "../api/posts";
 import { uploadMedia } from "../api/uploads";
 import { ApiError } from "../api/client";
+import { safeBack } from "../lib/navigation";
+import { SkyOceanBackground } from "../components/SkyOceanBackground";
 
 export default function PostComposerScreen() {
-  const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [caption, setCaption] = useState("");
   const [media, setMedia] = useState<{ uri: string; type: "image" | "video" } | null>(null);
   const [posting, setPosting] = useState(false);
@@ -50,7 +53,7 @@ export default function PostComposerScreen() {
       } else {
         await createPost({ profileId: activeProfile.id, type: "text", caption: caption.trim() });
       }
-      router.back();
+      safeBack();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not create that post.");
     } finally {
@@ -59,9 +62,10 @@ export default function PostComposerScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <SkyOceanBackground tone="pale" />
       <View style={styles.headerRow}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => safeBack()}>
           <Text style={styles.cancel}>Cancel</Text>
         </Pressable>
         <Text style={styles.title}>New Post</Text>
@@ -70,14 +74,17 @@ export default function PostComposerScreen() {
         </Pressable>
       </View>
 
-      <TextInput
-        style={styles.textArea}
-        placeholder={`What's on your mind, ${activeProfile?.displayName ?? ""}?`}
-        placeholderTextColor={colors.textSecondary}
-        multiline
-        value={caption}
-        onChangeText={setCaption}
-      />
+      <View style={styles.textAreaWrap}>
+        <Ionicons name="create-outline" size={18} color={colors.textSecondary} style={styles.textAreaIcon} />
+        <TextInput
+          style={styles.textArea}
+          placeholder={`What's on your mind, ${activeProfile?.displayName ?? ""}?`}
+          placeholderTextColor={colors.textSecondary}
+          multiline
+          value={caption}
+          onChangeText={setCaption}
+        />
+      </View>
 
       {media && (
         <View style={styles.mediaPreviewWrap}>
@@ -111,19 +118,27 @@ export default function PostComposerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  container: { flex: 1, padding: spacing.lg },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },
   title: { ...typography.h3, color: colors.textPrimary },
   cancel: { ...typography.body, color: colors.textSecondary },
   post: { ...typography.body, color: colors.primary, fontWeight: "700" },
-  textArea: {
+  textAreaWrap: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "rgba(16, 42, 49, 0.08)",
     borderRadius: radii.md,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  textAreaIcon: { marginRight: spacing.xs, marginTop: 2 },
+  textArea: {
+    flex: 1,
     minHeight: 120,
     textAlignVertical: "top",
+    paddingBottom: spacing.md,
     ...typography.body,
     color: colors.textPrimary,
   },

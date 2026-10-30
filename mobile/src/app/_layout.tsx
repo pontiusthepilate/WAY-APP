@@ -8,6 +8,8 @@ import * as Notifications from "expo-notifications";
 import { useFonts, Gabarito_600SemiBold, Gabarito_700Bold } from "@expo-google-fonts/gabarito";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { usePushRegistration } from "../lib/usePushRegistration";
+import { WaterRippleOverlay } from "../components/WaterRippleOverlay";
+import { EdgeGlowBorder } from "../components/EdgeGlowBorder";
 import { colors } from "../theme/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -54,6 +56,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       if (data?.liveSessionId) router.push(`/live/${data.liveSessionId}`);
       else if (data?.remoteCameraRequestId) router.push(`/camera-request/${data.remoteCameraRequestId}`);
       else if (data?.remoteCameraSessionId) router.push(`/remote-camera/${data.remoteCameraSessionId}`);
+      else if (data?.wayRequestId) router.push(`/way-request/${data.wayRequestId}`);
     });
     return () => sub.remove();
   }, [router]);
@@ -66,5 +69,12 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <WaterRippleOverlay>
+        <Stack screenOptions={{ headerShown: false }} />
+      </WaterRippleOverlay>
+      <EdgeGlowBorder />
+    </>
+  );
 }

@@ -7,6 +7,7 @@ const OPTIONS: { key: SearchMode; label: string }[] = [
   { key: "nearby", label: "Nearby" },
   { key: "address", label: "Address" },
   { key: "location", label: "Location" },
+  { key: "wayid", label: "WAY ID" },
 ];
 
 export function SearchModeTabs({ value, onChange }: { value: SearchMode; onChange: (v: SearchMode) => void }) {

@@ -84,17 +84,18 @@ model Profile {
 // through search (feature 2). Media is a URL into object storage — uploading
 // the file there is a separate concern from this record.
 model WayRequest {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   fromProfileId  String
   toProfileId    String
   text           String?
   mediaUrl       String?
   mediaType      String? // "image" | "video"
-  status         String   @default("pending") // pending | accepted | declined
-  createdAt      DateTime @default(now())
+  status         String    @default("pending") // pending | accepted | declined
+  createdAt      DateTime  @default(now())
+  respondedAt    DateTime?
 
   @@index([fromProfileId])
-  @@index([toProfileId])
+  @@index([toProfileId, status])
 }
 
 // A timeline post (feature: profile timeline). Text-only, image, or video —

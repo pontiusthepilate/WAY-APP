@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { RadarView } from "../../components/RadarView";
 import { ConnectionRow } from "../../components/ConnectionRow";
@@ -19,14 +20,25 @@ import { ViewToggle } from "../../components/ViewToggle";
 import { SearchModeTabs } from "../../components/SearchModeTabs";
 import { RadiusPicker } from "../../components/RadiusPicker";
 import { MiniProfileModal } from "../../components/MiniProfileModal";
+import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../../components/CountryCodePicker";
 import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
-import { searchAddress, searchLocation, searchNearby } from "../../api/search";
+import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
+import { searchAddress, searchByWayId, searchLocation, searchNearby } from "../../api/search";
 import { updateVisibility } from "../../api/profiles";
 import type { NearbyResult, ResultView, SearchMode } from "../../types";
 import { ApiError } from "../../api/client";
 
 const RADAR_SIZE = Math.min(Dimensions.get("window").width - spacing.xl * 2, 340);
+
+// Mirrors the backend's own PHONE_LIKE check (search.ts) — a query that
+// starts with a digit (or a leading "+") is treated as a phone number, so
+// the country-code trigger only shows up when it'd actually apply, not
+// while someone's typing a WAY ID.
+function looksLikePhone(value: string): boolean {
+  return /^\+?[0-9]/.test(value.trim());
+}
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -35,10 +47,13 @@ export default function SearchScreen() {
 
   const [mode, setMode] = useState<SearchMode>("nearby");
   const [view, setView] = useState<ResultView>("radar");
-  const [radiusMeters, setRadiusMeters] = useState(5000);
+  const [radiusMeters, setRadiusMeters] = useState(500);
   const [category, setCategory] = useState("");
   const [addressText, setAddressText] = useState("");
   const [locationText, setLocationText] = useState("");
+  const [wayIdText, setWayIdText] = useState("");
+  const [wayIdCountry, setWayIdCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
 
   const [results, setResults] = useState<NearbyResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,6 +63,17 @@ export default function SearchScreen() {
   useEffect(() => {
     if (mode === "nearby") refreshDeviceLocation();
   }, [mode, refreshDeviceLocation]);
+
+  useEffect(() => {
+    // Resets stale results/errors from the previous mode, and steers off the
+    // radar view for WAY ID mode (whose results have no distance/bearing,
+    // the two numbers radar placement depends on).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setResults([]);
+    setError(null);
+    if (mode === "wayid" && view === "radar") setView("list");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const runSearch = useCallback(async () => {
     if (!activeProfile) return;
@@ -73,7 +99,7 @@ export default function SearchScreen() {
           radiusMeters,
           category: category || undefined,
         });
-      } else {
+      } else if (mode === "location") {
         if (!locationText.trim()) {
           setError("Enter a place, city, state, or country to search.");
           return;
@@ -84,6 +110,20 @@ export default function SearchScreen() {
           radiusMeters,
           category: category || undefined,
         });
+      } else {
+        const trimmed = wayIdText.trim();
+        if (!trimmed) {
+          setError("Enter a WAY ID or phone number to search.");
+          return;
+        }
+        // A bare national number needs the selected country's dial code
+        // prefixed to match how it's stored — the same E.164 format
+        // sign-in resolves phone numbers to.
+        const query = looksLikePhone(trimmed) && !trimmed.startsWith("+")
+          ? `+${wayIdCountry.dialCode}${trimmed.replace(/\D/g, "")}`
+          : trimmed;
+        next = await searchByWayId({ profileId: activeProfile.id, query });
+        if (next.length === 0) setError("No WAY found with that ID or phone number.");
       }
       setResults(next);
     } catch (err) {
@@ -91,7 +131,7 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeProfile, mode, coords, radiusMeters, category, addressText, locationText, refreshDeviceLocation]);
+  }, [activeProfile, mode, coords, radiusMeters, category, addressText, locationText, wayIdText, wayIdCountry, refreshDeviceLocation]);
 
   useEffect(() => {
     // Runs the search in response to the device location or mode changing;
@@ -119,6 +159,7 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
+      <SkyOceanBackground tone="pale" />
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>WAY</Text>
@@ -138,39 +179,82 @@ export default function SearchScreen() {
         <SearchModeTabs value={mode} onChange={setMode} />
 
         {mode === "address" && (
-          <TextInput
-            style={styles.input}
-            placeholder="Street address, anywhere on earth"
-            placeholderTextColor={colors.textSecondary}
-            value={addressText}
-            onChangeText={setAddressText}
-            onSubmitEditing={runSearch}
-          />
+          <View style={styles.inputWrap}>
+            <Ionicons name="location-outline" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Street address, anywhere on earth"
+              placeholderTextColor={colors.textSecondary}
+              value={addressText}
+              onChangeText={setAddressText}
+              onSubmitEditing={runSearch}
+            />
+          </View>
         )}
         {mode === "location" && (
-          <TextInput
-            style={styles.input}
-            placeholder="Place, city, state, county, or country"
-            placeholderTextColor={colors.textSecondary}
-            value={locationText}
-            onChangeText={setLocationText}
-            onSubmitEditing={runSearch}
-          />
+          <View style={styles.inputWrap}>
+            <Ionicons name="earth-outline" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Place, city, state, county, or country"
+              placeholderTextColor={colors.textSecondary}
+              value={locationText}
+              onChangeText={setLocationText}
+              onSubmitEditing={runSearch}
+            />
+          </View>
+        )}
+        {mode === "wayid" && (
+          <>
+            <View style={styles.inputWrap}>
+              {looksLikePhone(wayIdText) ? (
+                <>
+                  <CountryCodeTrigger value={wayIdCountry} onPress={() => setCountryPickerOpen(true)} />
+                  <CountryCodeDivider />
+                </>
+              ) : (
+                <Ionicons name="at-outline" size={18} color={colors.textSecondary} />
+              )}
+              <TextInput
+                style={styles.input}
+                placeholder="WAY ID (username) or phone number"
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="none"
+                value={wayIdText}
+                onChangeText={setWayIdText}
+                onSubmitEditing={runSearch}
+              />
+            </View>
+            <CountryPickerSheet
+              open={countryPickerOpen}
+              onClose={() => setCountryPickerOpen(false)}
+              onSelect={(c) => {
+                setWayIdCountry(c);
+                setCountryPickerOpen(false);
+              }}
+            />
+          </>
         )}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Category / interest (optional)"
-          placeholderTextColor={colors.textSecondary}
-          value={category}
-          onChangeText={setCategory}
-        />
+        {mode !== "wayid" && (
+          <View style={styles.inputWrap}>
+            <Ionicons name="pricetag-outline" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Category / interest (optional)"
+              placeholderTextColor={colors.textSecondary}
+              value={category}
+              onChangeText={setCategory}
+            />
+          </View>
+        )}
 
-        <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />
+        {mode !== "wayid" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
 
         {mode !== "nearby" && (
           <Pressable style={styles.searchButton} onPress={runSearch}>
             <Text style={styles.searchButtonText}>Search</Text>
+            <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
           </Pressable>
         )}
 
@@ -193,6 +277,7 @@ export default function SearchScreen() {
           <FlatList
             data={results}
             keyExtractor={(r) => r.id}
+            contentContainerStyle={styles.listPadding}
             renderItem={({ item }) => <ConnectionRow result={item} onPress={() => setSelected(item)} />}
           />
         )}
@@ -201,6 +286,7 @@ export default function SearchScreen() {
             data={results}
             keyExtractor={(r) => r.id}
             numColumns={2}
+            contentContainerStyle={styles.listPadding}
             renderItem={({ item }) => <ConnectionGridItem result={item} onPress={() => setSelected(item)} />}
           />
         )}
@@ -217,7 +303,8 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
+  listPadding: { paddingBottom: 90 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -231,21 +318,32 @@ const styles = StyleSheet.create({
   visibilityRow: { alignItems: "center" },
   visibilityLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 2 },
   controls: { paddingHorizontal: spacing.lg, gap: spacing.sm },
-  input: {
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
+  },
+  input: {
+    flex: 1,
     paddingVertical: spacing.sm,
     ...typography.body,
     color: colors.textPrimary,
   },
   searchButton: {
+    flexDirection: "row",
+    gap: spacing.xs,
     backgroundColor: colors.horizonDeep,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
     borderRadius: radii.pill,
     paddingVertical: spacing.sm,
     alignItems: "center",
+    justifyContent: "center",
   },
   searchButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
   spinner: { marginTop: spacing.md },

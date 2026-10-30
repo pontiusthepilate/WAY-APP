@@ -11,8 +11,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import {
@@ -24,14 +26,15 @@ import {
   sendLiveChat,
   startLiveSession,
 } from "../../api/live";
+import { safeBack } from "../../lib/navigation";
 import type { LiveChatMessage, LiveSession } from "../../types";
 
 const CHAT_POLL_MS = 4000;
 
 export default function LiveSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
 
   const [session, setSession] = useState<LiveSession | null>(null);
@@ -68,6 +71,9 @@ export default function LiveSessionScreen() {
 
   useEffect(() => {
     if (!id || session?.status !== "live") return;
+    // Fetch once immediately so chat isn't blank for up to CHAT_POLL_MS after
+    // landing on (or reloading) an already-live session, then keep polling.
+    getLiveChat(id).then(setMessages).catch(() => {});
     const poll = setInterval(() => {
       getLiveChat(id).then(setMessages).catch(() => {});
       getLiveSession(id).then(setSession).catch(() => {});
@@ -84,7 +90,7 @@ export default function LiveSessionScreen() {
   async function handleEnd() {
     if (!id) return;
     await endLiveSession(id);
-    router.back();
+    safeBack();
   }
 
   async function handleSendChat() {
@@ -106,7 +112,7 @@ export default function LiveSessionScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.endedText}>This live session has ended.</Text>
-        <Pressable style={styles.doneButton} onPress={() => router.back()}>
+        <Pressable style={styles.doneButton} onPress={() => safeBack()}>
           <Text style={styles.doneButtonText}>Back</Text>
         </Pressable>
       </View>
@@ -123,6 +129,7 @@ export default function LiveSessionScreen() {
         {isBroadcaster ? (
           <Pressable style={styles.doneButton} onPress={handleStartNow}>
             <Text style={styles.doneButtonText}>Start Now</Text>
+            <Ionicons name="videocam-outline" size={18} color={colors.primaryDark} />
           </Pressable>
         ) : (
           <Text style={styles.notice}>Check back at the scheduled time.</Text>
@@ -156,7 +163,7 @@ export default function LiveSessionScreen() {
           </View>
         )}
 
-        <View style={styles.overlayTop}>
+        <View style={[styles.overlayTop, { top: spacing.lg + insets.top }]}>
           <View style={styles.liveTag}>
             <Text style={styles.liveTagText}>● LIVE</Text>
           </View>
@@ -165,7 +172,7 @@ export default function LiveSessionScreen() {
           </View>
         </View>
 
-        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+        <Pressable style={[styles.closeButton, { top: spacing.lg + insets.top }]} onPress={() => safeBack()}>
           <Text style={styles.closeButtonText}>✕</Text>
         </Pressable>
 
@@ -189,16 +196,20 @@ export default function LiveSessionScreen() {
       />
 
       <View style={styles.composerRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Say something…"
-          placeholderTextColor={colors.textSecondary}
-          value={draft}
-          onChangeText={setDraft}
-          onSubmitEditing={handleSendChat}
-        />
+        <View style={styles.inputWrap}>
+          <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Say something…"
+            placeholderTextColor={colors.textSecondary}
+            value={draft}
+            onChangeText={setDraft}
+            onSubmitEditing={handleSendChat}
+          />
+        </View>
         <Pressable style={styles.sendButton} onPress={handleSendChat} disabled={!draft.trim()}>
           <Text style={styles.sendButtonText}>Send</Text>
+          <Ionicons name="paper-plane-outline" size={16} color={colors.textOnPrimary} />
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -262,27 +273,51 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  input: {
+  inputWrap: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: "rgba(16, 42, 49, 0.08)",
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
+  },
+  inputIcon: { marginRight: spacing.xs },
+  input: {
+    flex: 1,
     paddingVertical: spacing.sm,
     ...typography.body,
     color: colors.textPrimary,
   },
-  sendButton: { backgroundColor: colors.primary, borderRadius: radii.pill, paddingHorizontal: spacing.md, justifyContent: "center" },
+  sendButton: {
+    flexDirection: "row",
+    gap: 4,
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sendButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
   scheduledTitle: { ...typography.h2, color: colors.textOnPrimary, textAlign: "center" },
   scheduledFor: { ...typography.body, color: colors.primaryLight, marginTop: spacing.sm, textAlign: "center" },
   notice: { ...typography.caption, color: colors.primaryLight, marginTop: spacing.lg, textAlign: "center" },
   endedText: { ...typography.h3, color: colors.textOnPrimary },
   doneButton: {
+    flexDirection: "row",
+    gap: spacing.xs,
     marginTop: spacing.xl,
     backgroundColor: colors.warning,
+    borderWidth: 1,
+    borderColor: "rgba(6, 46, 56, 0.18)",
     borderRadius: radii.pill,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
   doneButtonText: { color: colors.primaryDark, fontWeight: "700" },
 });

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { ALLOWED_CURRENCIES, isAllowedCurrency } from "../lib/currency";
@@ -41,8 +42,24 @@ const historyQuery = z.object({
 
 const verifyFundBody = z.object({ profileId: z.string(), reference: z.string() });
 
+// A plain upsert with nothing to update on conflict isn't atomic in Prisma
+// (there's no real ON CONFLICT DO UPDATE SET to fall back on), so two
+// concurrent first-touches of the same profile's wallet — e.g. the wallet
+// screen's parallel GET /wallet and GET /wallet/transactions — can both
+// attempt the create and one loses to a unique constraint violation.
+// Recover by just fetching the row the other request created.
 async function getOrCreateWallet(profileId: string) {
-  return prisma.wallet.upsert({ where: { profileId }, create: { profileId }, update: {} });
+  const existing = await prisma.wallet.findUnique({ where: { profileId } });
+  if (existing) return existing;
+  try {
+    return await prisma.wallet.create({ data: { profileId } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const race = await prisma.wallet.findUnique({ where: { profileId } });
+      if (race) return race;
+    }
+    throw err;
+  }
 }
 
 // Paystack requires an email on every transaction. Profiles aren't required
@@ -231,10 +248,19 @@ export async function walletRoutes(app: FastifyInstance) {
     await assertOwnsProfile(userId, q.profileId);
     const wallet = await getOrCreateWallet(q.profileId);
 
+    // A counterparty filter was requested if either param is present — track
+    // that separately from the resolved id, since "withWayId didn't match
+    // any profile" must return zero results, not silently fall back to the
+    // unfiltered list (which `counterpartyProfileId ? {...} : {}` would do).
+    const counterpartyFilterRequested = !!q.withProfileId || !!q.withWayId;
     let counterpartyProfileId = q.withProfileId;
     if (!counterpartyProfileId && q.withWayId) {
       const p = await prisma.profile.findUnique({ where: { wayId: q.withWayId } });
       counterpartyProfileId = p?.id;
+    }
+
+    if (counterpartyFilterRequested && !counterpartyProfileId) {
+      return { transactions: [], nextCursor: null };
     }
 
     const transactions = await prisma.transaction.findMany({

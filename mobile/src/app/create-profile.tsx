@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { createProfile } from "../api/profiles";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
+import { SkyOceanBackground } from "../components/SkyOceanBackground";
 
 const KINDS: { key: "personal" | "business"; label: string }[] = [
   { key: "personal", label: "Personal" },
@@ -35,7 +37,9 @@ export default function CreateProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={styles.root}>
+      <SkyOceanBackground tone="pale" />
+      <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Choose your WAY</Text>
       <Text style={styles.subtitle}>
         This is what people will ask you for socially — &ldquo;what&apos;s your WAY?&rdquo; — instead of a username.
@@ -44,6 +48,7 @@ export default function CreateProfileScreen() {
 
       <Text style={styles.label}>Your WAY</Text>
       <View style={styles.wayInputWrap}>
+        <Ionicons name="at-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
         <Text style={styles.wayPrefix}>WAY/</Text>
         <TextInput
           style={styles.wayInput}
@@ -56,13 +61,16 @@ export default function CreateProfileScreen() {
       </View>
 
       <Text style={styles.label}>Display name</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="How you'll appear to others"
-        placeholderTextColor={colors.textSecondary}
-        value={displayName}
-        onChangeText={setDisplayName}
-      />
+      <View style={styles.inputWrap}>
+        <Ionicons name="person-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="How you'll appear to others"
+          placeholderTextColor={colors.textSecondary}
+          value={displayName}
+          onChangeText={setDisplayName}
+        />
+      </View>
 
       <Text style={styles.label}>Profile type</Text>
       <View style={styles.kindRow}>
@@ -84,14 +92,23 @@ export default function CreateProfileScreen() {
         disabled={!wayId || !displayName || loading}
         onPress={handleCreate}
       >
-        {loading ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.buttonText}>Create profile</Text>}
+        {loading ? (
+          <ActivityIndicator color={colors.textOnPrimary} />
+        ) : (
+          <>
+            <Text style={styles.buttonText}>Create profile</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.textOnPrimary} />
+          </>
+        )}
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.xl, justifyContent: "center" },
+  root: { flex: 1 },
+  container: { flexGrow: 1, padding: spacing.xl, justifyContent: "center" },
   title: { ...typography.h1, color: colors.textPrimary, textAlign: "center" },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm, marginBottom: spacing.lg },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md },
@@ -100,18 +117,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
   },
+  inputIcon: { marginRight: spacing.xs },
   wayPrefix: { ...typography.body, color: colors.primaryDark, fontWeight: "700" },
   wayInput: { flex: 1, paddingVertical: spacing.sm, ...typography.body, color: colors.textPrimary },
-  input: {
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
+  },
+  input: {
+    flex: 1,
     paddingVertical: spacing.sm,
     ...typography.body,
     color: colors.textPrimary,
@@ -130,11 +153,16 @@ const styles = StyleSheet.create({
   kindLabelActive: { color: colors.textOnPrimary },
   error: { color: colors.danger, marginTop: spacing.md, ...typography.caption, textAlign: "center" },
   button: {
+    flexDirection: "row",
+    gap: spacing.xs,
     marginTop: spacing.xl,
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
     borderRadius: radii.pill,
     paddingVertical: spacing.sm,
     alignItems: "center",
+    justifyContent: "center",
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.textOnPrimary, fontWeight: "700", fontSize: 16 },

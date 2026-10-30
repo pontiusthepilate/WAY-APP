@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { fundWallet, verifyFunding } from "../api/wallet";
 import { toMinorUnits } from "../lib/formatCurrency";
 import { CURRENCIES, type Currency } from "../types";
 import { ApiError } from "../api/client";
+import { safeBack } from "../lib/navigation";
+import { SkyOceanBackground } from "../components/SkyOceanBackground";
 
 const METHODS: { key: "card" | "crypto"; label: string }[] = [
   { key: "card", label: "Card" },
@@ -21,8 +24,8 @@ const REAL_FUNDING_CURRENCIES: Currency[] = ["NGN"];
 const PAYSTACK_REDIRECT_URL = "way://wallet-fund-callback";
 
 export default function WalletFundScreen() {
-  const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [currency, setCurrency] = useState<Currency>("USD");
   const [method, setMethod] = useState<"card" | "crypto">("card");
   const [amount, setAmount] = useState("");
@@ -41,7 +44,7 @@ export default function WalletFundScreen() {
       const result = await fundWallet({ profileId: activeProfile.id, currency, amount: toMinorUnits(parsedAmount), method });
 
       if (result.status === "completed") {
-        router.back();
+        safeBack("/wallet");
         return;
       }
 
@@ -56,7 +59,7 @@ export default function WalletFundScreen() {
 
       const verified = await verifyFunding({ profileId: activeProfile.id, reference: result.reference });
       if (verified.status === "completed") {
-        router.back();
+        safeBack("/wallet");
       } else {
         setError(verified.error || "Payment was not successful.");
       }
@@ -72,7 +75,8 @@ export default function WalletFundScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
+      <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Fund Wallet</Text>
 
       <Text style={styles.label}>Currency</Text>
@@ -85,14 +89,17 @@ export default function WalletFundScreen() {
       </View>
 
       <Text style={styles.label}>Amount</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="0.00"
-        placeholderTextColor={colors.textSecondary}
-        keyboardType="decimal-pad"
-        value={amount}
-        onChangeText={setAmount}
-      />
+      <View style={styles.inputWrap}>
+        <Ionicons name="cash-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="0.00"
+          placeholderTextColor={colors.textSecondary}
+          keyboardType="decimal-pad"
+          value={amount}
+          onChangeText={setAmount}
+        />
+      </View>
 
       <Text style={styles.label}>Method</Text>
       <View style={styles.chipRow}>
@@ -114,7 +121,14 @@ export default function WalletFundScreen() {
       {error && <Text style={styles.error}>{error}</Text>}
 
       <Pressable style={[styles.button, !isValid && styles.buttonDisabled]} onPress={handleFund} disabled={!isValid || loading}>
-        {loading ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.buttonText}>Fund</Text>}
+        {loading ? (
+          <ActivityIndicator color={colors.textOnPrimary} />
+        ) : (
+          <>
+            <Text style={styles.buttonText}>Fund</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.textOnPrimary} />
+          </>
+        )}
       </Pressable>
 
       <Text style={styles.footnote}>
@@ -127,7 +141,7 @@ export default function WalletFundScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl },
+  container: { flex: 1, padding: spacing.xl },
   title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.lg },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
@@ -151,12 +165,18 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipLabel: { ...typography.body, color: colors.textSecondary, fontWeight: "600" },
   chipLabelActive: { color: colors.textOnPrimary },
-  input: {
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
+  },
+  inputIcon: { marginRight: spacing.xs },
+  input: {
+    flex: 1,
     paddingVertical: spacing.sm,
     fontSize: 24,
     color: colors.textPrimary,
@@ -164,11 +184,16 @@ const styles = StyleSheet.create({
   notice: { ...typography.caption, color: colors.warning, marginTop: spacing.sm },
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.md, ...typography.caption },
   button: {
+    flexDirection: "row",
+    gap: spacing.xs,
     marginTop: spacing.xl,
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
     borderRadius: 999,
     paddingVertical: spacing.sm,
     alignItems: "center",
+    justifyContent: "center",
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.textOnPrimary, fontWeight: "700", fontSize: 16 },

@@ -37,3 +37,8 @@ export function searchLocation(input: {
 }) {
   return api.get<NearbyResult[]>(`/search/location${qs(input)}`);
 }
+
+// Exact lookup by WAY ID (username) or phone number — no distance/bearing.
+export function searchByWayId(input: { profileId: string; query: string }) {
+  return api.get<NearbyResult[]>(`/search/way-id${qs(input)}`);
+}

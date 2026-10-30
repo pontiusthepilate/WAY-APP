@@ -1,7 +1,19 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { prisma } from "../lib/db";
 import { findNearbyProfiles } from "../lib/geo";
-import { geocodeAddress } from "../lib/geocode";
+import { geocodeAddress, GeocodeConfigError } from "../lib/geocode";
+import { normalizeWayId } from "../lib/wayId";
+
+// Config/outage errors are logged with the real reason but never shown to
+// the end user verbatim; a bad address gets its own (already friendly) message.
+function geocodeErrorResponse(err: unknown): { status: number; body: { error: string } } {
+  if (err instanceof GeocodeConfigError) {
+    console.error("[WAY][geocode]", err.message);
+    return { status: 422, body: { error: "Address search is temporarily unavailable. Try again later." } };
+  }
+  return { status: 422, body: { error: (err as Error).message } };
+}
 
 const DEFAULT_RADIUS_METERS = 5000;
 const MAX_RADIUS_METERS = 100_000;
@@ -36,6 +48,29 @@ const locationQuery = z
     message: "Provide either lat & lng, or a place name query",
   });
 
+const wayIdQuery = z.object({
+  profileId: z.string(),
+  query: z.string().min(1),
+});
+
+// A WAY-ID lookup result has no meaningful distance/bearing — it's an exact
+// handle/phone match, not a geo search — so it's shaped like NearbyResult
+// minus those two fields.
+const LOOKUP_SELECT = {
+  id: true,
+  wayId: true,
+  displayName: true,
+  displayPictureUrl: true,
+  categories: true,
+  visibilityText: true,
+  visibilityImageUrl: true,
+  isLocationOverridden: true,
+} as const;
+
+// Loose enough to accept "+1 555 123 4567", "555-123-4567", "15551234567",
+// etc.; anything that doesn't look like a phone number is treated as a WayID.
+const PHONE_LIKE = /^\+?[0-9][0-9\s\-().]{4,}$/;
+
 export async function searchRoutes(app: FastifyInstance) {
   // A) NEARBY — search around the requester's own current device position.
   app.get("/search/nearby", { onRequest: [app.authenticate] }, async (req) => {
@@ -57,7 +92,8 @@ export async function searchRoutes(app: FastifyInstance) {
     try {
       point = await geocodeAddress(q.address);
     } catch (err) {
-      return reply.status(422).send({ error: (err as Error).message });
+      const { status, body } = geocodeErrorResponse(err);
+      return reply.status(status).send(body);
     }
     return findNearbyProfiles({
       lat: point.lat,
@@ -82,7 +118,8 @@ export async function searchRoutes(app: FastifyInstance) {
         lat = point.lat;
         lng = point.lng;
       } catch (err) {
-        return reply.status(422).send({ error: (err as Error).message });
+        const { status, body } = geocodeErrorResponse(err);
+        return reply.status(status).send(body);
       }
     }
 
@@ -94,5 +131,36 @@ export async function searchRoutes(app: FastifyInstance) {
       excludeProfileId: q.profileId,
       visibilityColumn: "visibleToLocation",
     });
+  });
+
+  // D) WAY ID — exact lookup by someone's @wayId handle or their account's
+  // phone number. Unlike the three geo modes above, this isn't discovery —
+  // the searcher already has a specific handle or number in hand — so it
+  // intentionally ignores visibleToNearby/Address/Location and only respects
+  // the master isVisible switch. A phone number can own more than one
+  // profile (each account gets up to FREE_PROFILE_LIMIT), so that branch can
+  // return multiple results; a WayID is globally unique, so it returns at
+  // most one.
+  app.get("/search/way-id", { onRequest: [app.authenticate] }, async (req) => {
+    const q = wayIdQuery.parse(req.query);
+    const raw = q.query.trim().replace(/^way\//i, "").trim();
+    if (!raw) return [];
+
+    if (PHONE_LIKE.test(raw)) {
+      const phone = raw.replace(/[\s\-().]/g, "");
+      const user = await prisma.user.findUnique({ where: { phone } });
+      if (!user) return [];
+      const profiles = await prisma.profile.findMany({
+        where: { userId: user.id, isVisible: true, id: { not: q.profileId } },
+        select: LOOKUP_SELECT,
+      });
+      return profiles;
+    }
+
+    const profile = await prisma.profile.findFirst({
+      where: { wayId: normalizeWayId(raw), isVisible: true, id: { not: q.profileId } },
+      select: LOOKUP_SELECT,
+    });
+    return profile ? [profile] : [];
   });
 }

@@ -67,9 +67,9 @@ export function RadarView({ results, radiusMeters, size, onSelect }: Props) {
       <View style={[styles.centerDot, { left: center - 7, top: center - 7 }]} />
 
       {results.map((r) => {
-        const clampedDistance = Math.min(r.distanceMeters, radiusMeters);
+        const clampedDistance = Math.min(r.distanceMeters ?? 0, radiusMeters);
         const screenRadius = (clampedDistance / radiusMeters) * maxScreenRadius;
-        const angleRad = (r.bearingDegrees * Math.PI) / 180;
+        const angleRad = ((r.bearingDegrees ?? 0) * Math.PI) / 180;
         const x = center + screenRadius * Math.sin(angleRad);
         const y = center - screenRadius * Math.cos(angleRad);
 

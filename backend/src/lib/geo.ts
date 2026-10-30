@@ -45,7 +45,7 @@ export async function findNearbyProfiles(params: {
       "id", "wayId", "displayName", "displayPictureUrl", "categories",
       "visibilityText", "visibilityImageUrl", "isLocationOverridden",
       ST_Distance("location", ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS "distanceMeters",
-      (degrees(ST_Azimuth(ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography::geometry, "location"::geometry)) + 360)::float % 360 AS "bearingDegrees"
+      ((degrees(ST_Azimuth(ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography::geometry, "location"::geometry)) + 360)::numeric % 360::numeric)::float AS "bearingDegrees"
     FROM "Profile"
     WHERE "location" IS NOT NULL
       AND "isVisible" = true

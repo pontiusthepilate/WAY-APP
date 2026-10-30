@@ -33,11 +33,13 @@ export interface NearbyResult {
   visibilityText: string | null;
   visibilityImageUrl: string | null;
   isLocationOverridden: boolean;
-  distanceMeters: number;
-  bearingDegrees: number;
+  // Absent for a WAY ID / phone lookup result (search/way-id) — that's an
+  // exact handle match, not a geo search, so there's no distance or bearing.
+  distanceMeters?: number;
+  bearingDegrees?: number;
 }
 
-export type SearchMode = "nearby" | "address" | "location";
+export type SearchMode = "nearby" | "address" | "location" | "wayid";
 export type ResultView = "radar" | "list" | "grid";
 
 export interface ProfileSummary {
@@ -122,6 +124,22 @@ export interface LiveChatMessage {
   profile: ProfileSummary | null;
   text: string;
   createdAt: string;
+}
+
+export type WayRequestStatus = "pending" | "accepted" | "declined";
+
+export interface WayRequest {
+  id: string;
+  fromProfileId: string;
+  toProfileId: string;
+  fromProfile: ProfileSummary | null;
+  toProfile: ProfileSummary | null;
+  text: string | null;
+  mediaUrl: string | null;
+  mediaType: "image" | "video" | null;
+  status: WayRequestStatus;
+  createdAt: string;
+  respondedAt: string | null;
 }
 
 export type RemoteCameraRequestStatus = "pending" | "accepted" | "declined";

@@ -38,7 +38,7 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
           </View>
 
           <View style={styles.statsRow}>
-            <Stat label="Distance" value={formatDistance(result.distanceMeters)} />
+            {result.distanceMeters != null && <Stat label="Distance" value={formatDistance(result.distanceMeters)} />}
             <Stat label="Category" value={result.categories[0] ?? "—"} />
             {result.isLocationOverridden && <Stat label="Location" value="Set remotely" warn />}
           </View>
