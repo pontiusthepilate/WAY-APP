@@ -7,6 +7,7 @@ import { createProfile } from "../api/profiles";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { DotOutline } from "../components/DotOutline";
 
 const KINDS: { key: "personal" | "business"; label: string }[] = [
   { key: "personal", label: "Personal" },
@@ -87,20 +88,22 @@ export default function CreateProfileScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable
-        style={[styles.button, (!wayId || !displayName || loading) && styles.buttonDisabled]}
-        disabled={!wayId || !displayName || loading}
-        onPress={handleCreate}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>Create profile</Text>
-            <Ionicons name="arrow-forward" size={18} color={colors.textOnPrimary} />
-          </>
-        )}
-      </Pressable>
+      <DotOutline radius={radii.pill} tone="onDark" style={styles.buttonSpacing}>
+        <Pressable
+          style={[styles.button, (!wayId || !displayName || loading) && styles.buttonDisabled]}
+          disabled={!wayId || !displayName || loading}
+          onPress={handleCreate}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Create profile</Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.textOnPrimary} />
+            </>
+          )}
+        </Pressable>
+      </DotOutline>
       </ScrollView>
     </View>
   );
@@ -152,10 +155,10 @@ const styles = StyleSheet.create({
   kindLabel: { color: colors.textSecondary, fontWeight: "600" },
   kindLabelActive: { color: colors.textOnPrimary },
   error: { color: colors.danger, marginTop: spacing.md, ...typography.caption, textAlign: "center" },
+  buttonSpacing: { marginTop: spacing.xl },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.xl,
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.25)",

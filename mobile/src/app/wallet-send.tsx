@@ -11,6 +11,7 @@ import type { Currency, WalletBalance } from "../types";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { DotOutline } from "../components/DotOutline";
 
 export default function WalletSendScreen() {
   const router = useRouter();
@@ -67,10 +68,12 @@ export default function WalletSendScreen() {
         <SkyOceanBackground tone="pale" />
         <Text style={styles.title}>Send Funds</Text>
         <Text style={styles.empty}>Fund your wallet first — there&apos;s nothing to send yet.</Text>
-        <Pressable style={styles.button} onPress={() => router.replace("/wallet-fund")}>
-          <Text style={styles.buttonText}>Fund Wallet</Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.primaryDark} />
-        </Pressable>
+        <DotOutline radius={radii.pill} tone="onLight" style={styles.buttonSpacing}>
+          <Pressable style={styles.button} onPress={() => router.replace("/wallet-fund")}>
+            <Text style={styles.buttonText}>Fund Wallet</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.primaryDark} />
+          </Pressable>
+        </DotOutline>
       </View>
     );
   }
@@ -133,16 +136,18 @@ export default function WalletSendScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={[styles.button, !isValid && styles.buttonDisabled]} onPress={handleSend} disabled={!isValid || loading}>
-        {loading ? (
-          <ActivityIndicator color={colors.primaryDark} />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>Send</Text>
-            <Ionicons name="paper-plane-outline" size={18} color={colors.primaryDark} />
-          </>
-        )}
-      </Pressable>
+      <DotOutline radius={radii.pill} tone="onLight" style={styles.buttonSpacing}>
+        <Pressable style={[styles.button, !isValid && styles.buttonDisabled]} onPress={handleSend} disabled={!isValid || loading}>
+          {loading ? (
+            <ActivityIndicator color={colors.primaryDark} />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Send</Text>
+              <Ionicons name="paper-plane-outline" size={18} color={colors.primaryDark} />
+            </>
+          )}
+        </Pressable>
+      </DotOutline>
     </View>
   );
 }
@@ -207,10 +212,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.md, ...typography.caption },
+  buttonSpacing: { marginTop: spacing.xl },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.xl,
     backgroundColor: colors.warning,
     borderWidth: 1,
     borderColor: "rgba(6, 46, 56, 0.18)",

@@ -7,6 +7,7 @@ import { requestOtp } from "../api/auth";
 import { ApiError } from "../api/client";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
 import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../components/CountryCodePicker";
+import { DotOutline } from "../components/DotOutline";
 import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
 
 export default function WelcomeScreen() {
@@ -80,20 +81,22 @@ export default function WelcomeScreen() {
         />
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <Pressable
-          style={[styles.button, (!identifier || loading) && styles.buttonDisabled]}
-          disabled={!identifier || loading}
-          onPress={handleContinue}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.primaryDark} />
-          ) : (
-            <>
-              <Text style={styles.buttonText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color={colors.primaryDark} />
-            </>
-          )}
-        </Pressable>
+        <DotOutline radius={radii.pill} tone="onLight" style={styles.buttonSpacing}>
+          <Pressable
+            style={[styles.button, (!identifier || loading) && styles.buttonDisabled]}
+            disabled={!identifier || loading}
+            onPress={handleContinue}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.primaryDark} />
+            ) : (
+              <>
+                <Text style={styles.buttonText}>Continue</Text>
+                <Ionicons name="arrow-forward" size={18} color={colors.primaryDark} />
+              </>
+            )}
+          </Pressable>
+        </DotOutline>
       </View>
 
       <Text style={styles.footnote}>We&apos;ll text or email you a 6-digit code to verify it&apos;s you.</Text>
@@ -129,10 +132,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   error: { color: colors.warning, marginTop: spacing.xs, ...typography.caption },
+  buttonSpacing: { marginTop: spacing.lg },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.lg,
     backgroundColor: colors.warning,
     borderWidth: 1,
     borderColor: "rgba(6, 46, 56, 0.18)",

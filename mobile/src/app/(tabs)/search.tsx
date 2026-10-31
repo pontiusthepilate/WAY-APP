@@ -21,6 +21,7 @@ import { SearchModeTabs } from "../../components/SearchModeTabs";
 import { RadiusPicker } from "../../components/RadiusPicker";
 import { MiniProfileModal } from "../../components/MiniProfileModal";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { DotOutline } from "../../components/DotOutline";
 import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../../components/CountryCodePicker";
 import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
@@ -252,10 +253,12 @@ export default function SearchScreen() {
         {mode !== "wayid" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
 
         {mode !== "nearby" && (
-          <Pressable style={styles.searchButton} onPress={runSearch}>
-            <Text style={styles.searchButtonText}>Search</Text>
-            <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
-          </Pressable>
+          <DotOutline radius={radii.pill} tone="onDark">
+            <Pressable style={styles.searchButton} onPress={runSearch}>
+              <Text style={styles.searchButtonText}>Search</Text>
+              <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
+            </Pressable>
+          </DotOutline>
         )}
 
         <ViewToggle value={view} onChange={setView} />

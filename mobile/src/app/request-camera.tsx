@@ -9,6 +9,7 @@ import { sendCameraRequest } from "../api/remoteCamera";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { DotOutline } from "../components/DotOutline";
 
 export default function RequestCameraScreen() {
   const { toWayId, toDisplayName } = useLocalSearchParams<{ toWayId: string; toDisplayName: string }>();
@@ -76,16 +77,18 @@ export default function RequestCameraScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={styles.button} onPress={handleSend} disabled={sending}>
-        {sending ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>Send Request</Text>
-            <Ionicons name="paper-plane-outline" size={18} color={colors.textOnPrimary} />
-          </>
-        )}
-      </Pressable>
+      <DotOutline radius={radii.pill} tone="onDark" style={styles.buttonSpacing}>
+        <Pressable style={styles.button} onPress={handleSend} disabled={sending}>
+          {sending ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Send Request</Text>
+              <Ionicons name="paper-plane-outline" size={18} color={colors.textOnPrimary} />
+            </>
+          )}
+        </Pressable>
+      </DotOutline>
     </View>
   );
 }
@@ -122,10 +125,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.md, ...typography.caption },
+  buttonSpacing: { marginTop: spacing.xl },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.xl,
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.25)",

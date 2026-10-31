@@ -11,6 +11,7 @@ import { uploadMedia } from "../api/uploads";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { DotOutline } from "../components/DotOutline";
 
 const MAX_VIDEO_SECONDS = 5;
 
@@ -127,16 +128,18 @@ export default function WayRequestScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={styles.button} onPress={handleSend} disabled={sending}>
-        {sending ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>Send WAY Request</Text>
-            <Ionicons name="paper-plane-outline" size={18} color={colors.textOnPrimary} />
-          </>
-        )}
-      </Pressable>
+      <DotOutline radius={radii.pill} tone="onDark" style={styles.buttonSpacing}>
+        <Pressable style={styles.button} onPress={handleSend} disabled={sending}>
+          {sending ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Send WAY Request</Text>
+              <Ionicons name="paper-plane-outline" size={18} color={colors.textOnPrimary} />
+            </>
+          )}
+        </Pressable>
+      </DotOutline>
     </View>
   );
 }
@@ -180,10 +183,10 @@ const styles = StyleSheet.create({
   videoBadge: { color: colors.primaryDark, fontWeight: "600" },
   removeMedia: { color: colors.danger, marginTop: spacing.xs, ...typography.caption },
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.md, ...typography.caption },
+  buttonSpacing: { marginTop: spacing.xl },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.xl,
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.25)",

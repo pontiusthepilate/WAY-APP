@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
@@ -7,6 +7,7 @@ import { verifyOtp } from "../api/auth";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { DotOutline } from "../components/DotOutline";
 import { findCountryByIdentifier } from "../lib/countries";
 
 export default function OtpScreen() {
@@ -36,6 +37,15 @@ export default function OtpScreen() {
     }
   }
 
+  // Submits itself the moment the code reaches 6 digits — whether that's
+  // the last digit typed or a full code landing in one go from a paste —
+  // so there's no separate tap needed on top of filling the field.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (code.length === 6 && !loading) handleVerify();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="medium" />
@@ -63,20 +73,22 @@ export default function OtpScreen() {
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable
-        style={[styles.button, (code.length !== 6 || loading) && styles.buttonDisabled]}
-        disabled={code.length !== 6 || loading}
-        onPress={handleVerify}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>Verify</Text>
-            <Ionicons name="checkmark-circle-outline" size={18} color={colors.textOnPrimary} />
-          </>
-        )}
-      </Pressable>
+      <DotOutline radius={radii.pill} tone="onDark" style={styles.buttonSpacing}>
+        <Pressable
+          style={[styles.button, (code.length !== 6 || loading) && styles.buttonDisabled]}
+          disabled={code.length !== 6 || loading}
+          onPress={handleVerify}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Verify</Text>
+              <Image source={require("../../assets/way-mark.png")} style={styles.buttonMark} />
+            </>
+          )}
+        </Pressable>
+      </DotOutline>
     </View>
   );
 }
@@ -102,10 +114,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   error: { color: colors.danger, marginTop: spacing.sm, ...typography.caption, textAlign: "center" },
+  buttonSpacing: { marginTop: spacing.lg },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.lg,
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.25)",
@@ -116,4 +128,5 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.textOnPrimary, fontWeight: "700", fontSize: 16 },
+  buttonMark: { width: 20, height: 20, borderRadius: 10 },
 });

@@ -9,6 +9,7 @@ import { useSession } from "../context/SessionContext";
 import { createLiveSession } from "../api/live";
 import { ApiError } from "../api/client";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { DotOutline } from "../components/DotOutline";
 
 export default function GoLiveScreen() {
   const router = useRouter();
@@ -88,16 +89,18 @@ export default function GoLiveScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>{scheduling ? "Schedule Live" : "Go Live Now"}</Text>
-            <Ionicons name={scheduling ? "calendar-outline" : "videocam-outline"} size={18} color={colors.textOnPrimary} />
-          </>
-        )}
-      </Pressable>
+      <DotOutline radius={radii.pill} tone="onLight" style={styles.buttonSpacing}>
+        <Pressable style={styles.button} onPress={handleSubmit} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>{scheduling ? "Schedule Live" : "Go Live Now"}</Text>
+              <Ionicons name={scheduling ? "calendar-outline" : "videocam-outline"} size={18} color={colors.textOnPrimary} />
+            </>
+          )}
+        </Pressable>
+      </DotOutline>
 
       <Text style={styles.footnote}>
         Your followers will get a notification{scheduling ? " when you schedule this" : " that you're live"}. Video
@@ -151,10 +154,10 @@ const styles = StyleSheet.create({
   },
   dateButtonText: { ...typography.body, color: colors.textPrimary, fontWeight: "600" },
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.md, ...typography.caption },
+  buttonSpacing: { marginTop: spacing.xl },
   button: {
     flexDirection: "row",
     gap: spacing.xs,
-    marginTop: spacing.xl,
     backgroundColor: colors.danger,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.25)",

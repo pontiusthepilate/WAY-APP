@@ -3,8 +3,8 @@ import { Animated, Easing, StyleSheet, useWindowDimensions } from "react-native"
 import Svg, { Rect } from "react-native-svg";
 import { colors, radii } from "../theme/theme";
 
-// A slim outline traces the entire edge of the screen, and three comets —
-// a bright head with a fading tail — glide around it in a slow, endless lap,
+// A slim outline traces the entire edge of the screen, and three small,
+// illuminated points of light glide around it in a slow, endless lap,
 // pulsing brighter and dimmer as they travel so they read as something
 // alive, like light passing through a tunnel rather than a static painted
 // line. Every pass has a light (near-white) layer AND a dark (navy) layer of
@@ -20,9 +20,7 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const LAP_DURATION_MS = 105000; // slow, ambient drift
 const PULSE_LEG_MS = 2600; // one brighten or dim half-cycle of the "breathing" glow
 const DOT_COUNT = 3;
-const HEAD_LENGTH = 16; // the comet's bright head
-const TAIL_LENGTH = 22; // the fading streak trailing behind it
-const TAIL_LAG = 18; // how far behind the head the tail sits, along the path
+const DOT_LENGTH = 1; // with round caps this draws as a small circle, not a dash
 const STROKE_WIDTH = 1.5;
 const GLOW_STROKE_WIDTH = 7;
 const BLOOM_STROKE_WIDTH = 15;
@@ -66,32 +64,24 @@ export function EdgeGlowBorder() {
   const rectHeight = Math.max(0, height - BLOOM_STROKE_WIDTH);
   const perimeter = 2 * (rectWidth + rectHeight);
 
-  // Three comets, evenly spaced: each dasharray pattern (one mark plus a
-  // gap) repeats exactly DOT_COUNT times around the perimeter, which SVG
-  // does automatically for a dasharray shorter than the path. The tail uses
-  // the same spacing but its own, longer mark, and sits a little further
-  // back along the path than the head via a separate, lagging dashoffset.
+  // Three dots, evenly spaced: the dash pattern is one dot-sized mark plus a
+  // gap sized so the whole pattern repeats exactly DOT_COUNT times around
+  // the perimeter, which SVG does automatically for a dasharray shorter
+  // than the path.
   const spacing = perimeter / DOT_COUNT;
-  const headDashArray = `${HEAD_LENGTH} ${Math.max(0, spacing - HEAD_LENGTH)}`;
-  const tailDashArray = `${TAIL_LENGTH} ${Math.max(0, spacing - TAIL_LENGTH)}`;
+  const dashArray = `${DOT_LENGTH} ${Math.max(0, spacing - DOT_LENGTH)}`;
 
-  const headOffset = progress.interpolate({
+  const strokeDashoffset = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -perimeter],
   });
-  const tailOffset = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [TAIL_LAG, -perimeter + TAIL_LAG],
-  });
 
-  const bloomOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.38] });
-  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.65] });
-  const headOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] });
-  const tailOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.45] });
-  const shadowBloomOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.22] });
-  const shadowGlowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.4] });
-  const shadowHeadOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.7] });
-  const shadowTailOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.28] });
+  const bloomOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.3] });
+  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.55] });
+  const coreOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+  const shadowBloomOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.06, 0.18] });
+  const shadowGlowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.32] });
+  const shadowCoreOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.6] });
 
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -100,50 +90,40 @@ export function EdgeGlowBorder() {
       <Rect x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none" stroke={DARK_COLOR} strokeWidth={1} strokeOpacity={0.12} />
       <Rect x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none" stroke={LIGHT_COLOR} strokeWidth={1} strokeOpacity={0.14} />
 
-      {/* Dark shadow passes beneath the light ones, same dash patterns, so
-          the comets read on a light/pale screen too, not just a dark one. */}
-      <AnimatedRect
-        x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
-        stroke={DARK_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={shadowTailOpacity}
-        strokeLinecap="round" strokeDasharray={tailDashArray} strokeDashoffset={tailOffset}
-      />
+      {/* Dark shadow passes beneath the light ones, same dash pattern, so
+          each dot reads on a light/pale screen too, not just a dark one. */}
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
         stroke={DARK_COLOR} strokeWidth={BLOOM_STROKE_WIDTH} strokeOpacity={shadowBloomOpacity}
-        strokeLinecap="round" strokeDasharray={headDashArray} strokeDashoffset={headOffset}
+        strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
         stroke={DARK_COLOR} strokeWidth={GLOW_STROKE_WIDTH} strokeOpacity={shadowGlowOpacity}
-        strokeLinecap="round" strokeDasharray={headDashArray} strokeDashoffset={headOffset}
+        strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
-        stroke={DARK_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={shadowHeadOpacity}
-        strokeLinecap="round" strokeDasharray={headDashArray} strokeDashoffset={headOffset}
+        stroke={DARK_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={shadowCoreOpacity}
+        strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
 
-      {/* The light tail, bloom, glow and head — brighter and warmer, reads
-          on its own against a dark or photographic screen. */}
-      <AnimatedRect
-        x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
-        stroke={LIGHT_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={tailOpacity}
-        strokeLinecap="round" strokeDasharray={tailDashArray} strokeDashoffset={tailOffset}
-      />
+      {/* The light bloom/glow/core — brighter and warmer, reads on its own
+          against a dark or photographic screen. */}
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
         stroke={LIGHT_COLOR} strokeWidth={BLOOM_STROKE_WIDTH} strokeOpacity={bloomOpacity}
-        strokeLinecap="round" strokeDasharray={headDashArray} strokeDashoffset={headOffset}
+        strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
         stroke={LIGHT_COLOR} strokeWidth={GLOW_STROKE_WIDTH} strokeOpacity={glowOpacity}
-        strokeLinecap="round" strokeDasharray={headDashArray} strokeDashoffset={headOffset}
+        strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
-        stroke={LIGHT_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={headOpacity}
-        strokeLinecap="round" strokeDasharray={headDashArray} strokeDashoffset={headOffset}
+        stroke={LIGHT_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={coreOpacity}
+        strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
     </Svg>
   );
