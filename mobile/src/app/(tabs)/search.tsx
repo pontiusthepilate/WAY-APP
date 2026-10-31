@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
@@ -43,6 +44,7 @@ function looksLikePhone(value: string): boolean {
 
 export default function SearchScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { activeProfile, refreshProfiles } = useSession();
   const { coords, refresh: refreshDeviceLocation, loading: locating } = useDeviceLocation();
 
@@ -161,7 +163,7 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <View>
           <Text style={styles.headerTitle}>WAY</Text>
           <Text style={styles.headerSubtitle}>{activeProfile ? `WAY/${activeProfile.wayId}` : ""}</Text>
@@ -353,5 +355,10 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.sm, ...typography.caption },
   empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.md, ...typography.body },
   resultsArea: { flex: 1, marginTop: spacing.sm },
-  radarWrap: { alignItems: "center", justifyContent: "center", flex: 1 },
+  // The bottom tab bar floats transparently over the content (see
+  // (tabs)/_layout.tsx) rather than pushing it up, so centering across the
+  // full flex:1 height would center behind it. The same paddingBottom the
+  // list/grid views already use (listPadding) keeps the center point in the
+  // space that's actually visible above the tab bar.
+  radarWrap: { alignItems: "center", justifyContent: "center", flex: 1, paddingBottom: 90 },
 });

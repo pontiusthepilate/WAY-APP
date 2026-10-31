@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { colors, spacing, typography } from "../../theme/theme";
 import { PostCard } from "../../components/PostCard";
@@ -14,6 +15,7 @@ import type { AutoScrollSpeed, LiveSession, Post } from "../../types";
 
 export default function FeedScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { activeProfile } = useSession();
   const listRef = useRef<FlatList<Post>>(null);
   const [speed, setSpeed] = useState<AutoScrollSpeed>("off");
@@ -76,7 +78,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <Text style={styles.headerTitle}>WAY</Text>
         <View style={styles.headerButtons}>
           <Pressable style={styles.liveButton} onPress={() => router.push("/go-live")}>

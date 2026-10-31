@@ -7,14 +7,16 @@ import { colors, radii } from "../theme/theme";
 // illuminated points of light glide around it in a slow, endless lap,
 // pulsing brighter and dimmer as they travel so they read as something
 // alive, like light passing through a tunnel rather than a static painted
-// line. Every pass has a light (near-white) layer AND a dark (navy) layer of
-// its own, the same halo trick `legibleText` in theme.ts uses for text:
-// whichever one actually contrasts with that screen's background is the one
-// that reads, so the whole thing stays visible over both the light and
-// dark/photo screens in the app without needing to know which screen it's
-// on. Mounted once at the root layout, above everything else and
-// pointerEvents="none", so it never competes with real content or steals a
-// touch.
+// line. Two of the three are the original light (near-white) color; the
+// third is an accent dot in the same teal the "Nearby" search tab uses when
+// active, so the edge carries a bit of brand color instead of reading as
+// purely neutral. Every light pass has a dark (navy) layer of its own too,
+// the same halo trick `legibleText` in theme.ts uses for text: whichever one
+// actually contrasts with that screen's background is the one that reads,
+// so the whole thing stays visible over both the light and dark/photo
+// screens in the app without needing to know which screen it's on. Mounted
+// once at the root layout, above everything else and pointerEvents="none",
+// so it never competes with real content or steals a touch.
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 const LAP_DURATION_MS = 105000; // slow, ambient drift
@@ -24,7 +26,8 @@ const DOT_LENGTH = 1; // with round caps this draws as a small circle, not a das
 const STROKE_WIDTH = 1.5;
 const GLOW_STROKE_WIDTH = 7;
 const BLOOM_STROKE_WIDTH = 15;
-const LIGHT_COLOR = "#FFF6E6"; // light, airy near-white rather than a solid gold
+const LIGHT_COLOR = "#FFF6E6"; // light, airy near-white — two of the three dots
+const ACCENT_COLOR = colors.horizonDeep; // the third dot — same teal as the active "Nearby" tab
 const DARK_COLOR = colors.primaryDark;
 
 export function EdgeGlowBorder() {
@@ -70,6 +73,10 @@ export function EdgeGlowBorder() {
   // than the path.
   const spacing = perimeter / DOT_COUNT;
   const dashArray = `${DOT_LENGTH} ${Math.max(0, spacing - DOT_LENGTH)}`;
+  // The accent dot reuses the exact same offset but a dash pattern sized to
+  // the full perimeter, so its one mark lands exactly on top of the first
+  // of the three light dots rather than repeating alongside them.
+  const accentDashArray = `${DOT_LENGTH} ${Math.max(0, perimeter - DOT_LENGTH)}`;
 
   const strokeDashoffset = progress.interpolate({
     inputRange: [0, 1],
@@ -82,6 +89,9 @@ export function EdgeGlowBorder() {
   const shadowBloomOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.06, 0.18] });
   const shadowGlowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.32] });
   const shadowCoreOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.6] });
+  const accentBloomOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.38] });
+  const accentGlowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.65] });
+  const accentCoreOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] });
 
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -108,8 +118,7 @@ export function EdgeGlowBorder() {
         strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
       />
 
-      {/* The light bloom/glow/core — brighter and warmer, reads on its own
-          against a dark or photographic screen. */}
+      {/* The light bloom/glow/core — two of the three dots. */}
       <AnimatedRect
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
         stroke={LIGHT_COLOR} strokeWidth={BLOOM_STROKE_WIDTH} strokeOpacity={bloomOpacity}
@@ -124,6 +133,24 @@ export function EdgeGlowBorder() {
         x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
         stroke={LIGHT_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={coreOpacity}
         strokeLinecap="round" strokeDasharray={dashArray} strokeDashoffset={strokeDashoffset}
+      />
+
+      {/* The accent bloom/glow/core — the third dot, overlaid on top of
+          where the first light dot already sits. */}
+      <AnimatedRect
+        x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
+        stroke={ACCENT_COLOR} strokeWidth={BLOOM_STROKE_WIDTH} strokeOpacity={accentBloomOpacity}
+        strokeLinecap="round" strokeDasharray={accentDashArray} strokeDashoffset={strokeDashoffset}
+      />
+      <AnimatedRect
+        x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
+        stroke={ACCENT_COLOR} strokeWidth={GLOW_STROKE_WIDTH} strokeOpacity={accentGlowOpacity}
+        strokeLinecap="round" strokeDasharray={accentDashArray} strokeDashoffset={strokeDashoffset}
+      />
+      <AnimatedRect
+        x={inset} y={inset} width={rectWidth} height={rectHeight} rx={radii.lg} fill="none"
+        stroke={ACCENT_COLOR} strokeWidth={STROKE_WIDTH} strokeOpacity={accentCoreOpacity}
+        strokeLinecap="round" strokeDasharray={accentDashArray} strokeDashoffset={strokeDashoffset}
       />
     </Svg>
   );

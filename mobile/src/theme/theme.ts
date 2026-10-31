@@ -23,7 +23,7 @@ export const colors = {
   danger: "#F26A5B", // brand Accent Color (coral)
   warning: "#E6B655", // brand Accent Color (gold)
 
-  radarRing: "#D7E5E8",
+  radarRing: "rgba(10, 69, 84, 0.3)", // was too close to the background/border color to actually read
   radarSweep: "rgba(10, 69, 84, 0.14)",
 };
 

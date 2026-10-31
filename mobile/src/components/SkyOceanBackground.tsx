@@ -30,8 +30,8 @@ const WASH_COLOR: Record<BackgroundTone, string> = {
   deep: colors.primaryDark,
 };
 const WASH_OPACITY: Record<BackgroundTone, number> = {
-  pale: 0.5,
-  medium: 0.3,
+  pale: 0.25,
+  medium: 0.15,
   deep: 0.45,
 };
 
