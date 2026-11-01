@@ -1,5 +1,6 @@
 import "dotenv/config";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
@@ -31,6 +32,17 @@ async function main() {
   await app.register(multipart);
   await app.register(fastifyStatic, { root: path.join(process.cwd(), "uploads"), prefix: "/uploads/" });
 
+  // The Expo web export (mobile/dist, copied to ./web at build time) is a
+  // single-page app — one index.html plus hashed JS/asset files under their
+  // own real paths. Static assets are served as-is; the notFoundHandler
+  // below falls through to index.html for anything else, so Expo Router's
+  // client-side routing can render the right screen for a deep link or a
+  // hard refresh. decorateReply: false avoids a duplicate `sendFile`
+  // decorator clash with the /uploads/ registration above — this handler
+  // reads the file directly instead.
+  const webRoot = path.join(process.cwd(), "web");
+  await app.register(fastifyStatic, { root: webRoot, prefix: "/", decorateReply: false });
+
   app.decorate("authenticate", async (req: any, reply: any) => {
     try {
       await req.jwtVerify();
@@ -52,6 +64,20 @@ async function main() {
   await app.register(pushRoutes);
   await app.register(liveRoutes);
   await app.register(remoteCameraRoutes);
+
+  // Reached only when no API route or static file matched — i.e. a browser
+  // navigating straight to (or reloading) a client-side route like /feed.
+  // Missing locally in dev (no web/ build present), which is fine: that 404s
+  // normally instead of crashing, since local dev talks to Metro directly.
+  app.setNotFoundHandler(async (req, reply) => {
+    if (req.method !== "GET") return reply.status(404).send({ error: "Not found" });
+    try {
+      const html = await readFile(path.join(webRoot, "index.html"));
+      reply.type("text/html").send(html);
+    } catch {
+      reply.status(404).send({ error: "Not found" });
+    }
+  });
 
   const port = Number(process.env.PORT ?? 4000);
   await app.listen({ port, host: "0.0.0.0" });

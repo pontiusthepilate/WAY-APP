@@ -1,0 +1,18 @@
+app = "way-app"
+primary_region = "lhr"
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

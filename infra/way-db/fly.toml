@@ -1,0 +1,21 @@
+# Postgres + PostGIS for the WAY backend (way-app), reachable only over
+# Fly's private network at way-db.internal:5432 — no public ingress.
+app = "way-db"
+primary_region = "lhr"
+
+[build]
+  image = "postgis/postgis:16-3.4"
+
+[env]
+  POSTGRES_USER = "way"
+  POSTGRES_DB = "way"
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[[mounts]]
+  source = "way_db_data"
+  destination = "/var/lib/postgresql/data"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
