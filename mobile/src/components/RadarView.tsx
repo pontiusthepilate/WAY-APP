@@ -65,7 +65,11 @@ export function RadarView({ results, radiusMeters, size, onSelect }: Props) {
         ]}
       />
 
-      <LocationPulse style={[styles.centerDotWrap, { left: center - 7, top: center - 7 }]}>
+      <LocationPulse
+        // Reaches the 3rd ring line (of RING_COUNT) before fading out.
+        maxDiameter={2 * (maxScreenRadius / RING_COUNT) * 3}
+        style={[styles.centerDotWrap, { left: center - 7, top: center - 7 }]}
+      >
         <View style={styles.centerDot} />
       </LocationPulse>
 

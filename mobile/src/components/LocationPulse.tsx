@@ -12,11 +12,15 @@ const MAX_SCALE = 6; // ring grows to this many times the wrapped element's size
 
 interface Props {
   color?: string;
+  // Diameter in px the ring should grow to before fading out. Overrides
+  // MAX_SCALE — use this when the ring needs to reach a specific landmark
+  // (e.g. a surrounding ring line) regardless of the wrapped element's size.
+  maxDiameter?: number;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-export function LocationPulse({ color = colors.primary, children, style }: Props) {
+export function LocationPulse({ color = colors.primary, maxDiameter, children, style }: Props) {
   const [size, setSize] = useState(0);
   const progress = useRef(new Animated.Value(0)).current;
 
@@ -39,8 +43,15 @@ export function LocationPulse({ color = colors.primary, children, style }: Props
     setSize((prev) => (prev === next ? prev : next));
   }
 
-  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, MAX_SCALE] });
-  const opacity = progress.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.45, 0.15, 0] });
+  const maxScale = maxDiameter && size > 0 ? maxDiameter / size : MAX_SCALE;
+  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, maxScale] });
+  // `progress` itself runs on an ease-out curve (set below), so it reaches
+  // most of its range early — fading opacity out by 60% of *progress* meant
+  // the ring was nearly invisible well before its scale caught up to
+  // maxDiameter. Keeping opacity up until 85% of progress, then dropping
+  // fast, keeps the ring visible for the stretch where it's actually
+  // reaching its target size.
+  const opacity = progress.interpolate({ inputRange: [0, 0.85, 1], outputRange: [0.45, 0.22, 0] });
 
   return (
     <View style={style} onLayout={handleLayout}>
