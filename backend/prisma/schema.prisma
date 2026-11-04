@@ -356,3 +356,22 @@ model Report {
   @@index([targetType, targetId])
   @@index([status])
 }
+
+// An ephemeral status update (photo/video/text), visible for 24h from
+// creation. expiresAt is set once at creation rather than computed on
+// read, so every query just filters `expiresAt > now()` — no cron/cleanup
+// job needed. Visibility follows the profile's own isVisible switch (the
+// agreed-on rule: status visibility = profile visibility settings), not a
+// separate per-status flag.
+model Status {
+  id          String   @id @default(cuid())
+  profileId   String
+  mediaUrl    String?
+  mediaType   String? // "image" | "video"
+  caption     String?
+  backgroundColor String? // for a text-only status card
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([profileId, expiresAt])
+}
