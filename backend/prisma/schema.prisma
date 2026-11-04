@@ -293,3 +293,33 @@ model RemoteCameraSession {
   @@index([granterId, status])
   @@index([requesterId, status])
 }
+
+// A 1:1 DM thread between two profiles. profileAId/profileBId are always
+// stored in canonical (lower id first) order so a conversation between the
+// same two profiles can never be created twice under swapped ids.
+model Conversation {
+  id            String   @id @default(cuid())
+  profileAId    String
+  profileBId    String
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  messages DirectMessage[]
+
+  @@unique([profileAId, profileBId])
+  @@index([profileAId])
+  @@index([profileBId])
+}
+
+model DirectMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderProfileId String
+  text           String?
+  mediaUrl       String?
+  mediaType      String? // "image" | "video"
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}

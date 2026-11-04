@@ -10,9 +10,10 @@ interface Props {
   onClose: () => void;
   onSendRequest: (result: NearbyResult) => void;
   onRequestCamera: (result: NearbyResult) => void;
+  onMessage: (result: NearbyResult) => void;
 }
 
-export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCamera }: Props) {
+export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCamera, onMessage }: Props) {
   return (
     <Modal visible={!!result} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
@@ -57,6 +58,9 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
 
           <Pressable style={styles.requestButton} onPress={() => onSendRequest(result)}>
             <Text style={styles.requestButtonText}>Send WAY Request</Text>
+          </Pressable>
+          <Pressable style={styles.cameraButton} onPress={() => onMessage(result)}>
+            <Text style={styles.cameraButtonText}>Message</Text>
           </Pressable>
           <Pressable style={styles.cameraButton} onPress={() => onRequestCamera(result)}>
             <Text style={styles.cameraButtonText}>Request Camera Access</Text>

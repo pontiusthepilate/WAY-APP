@@ -156,6 +156,26 @@ export interface RemoteCameraRequest {
   respondedAt: string | null;
 }
 
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderProfileId: string;
+  text: string | null;
+  mediaUrl: string | null;
+  mediaType: "image" | "video" | null;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  profileAId: string;
+  profileBId: string;
+  otherProfile: ProfileSummary | null;
+  lastMessage: DirectMessage | null;
+  lastMessageAt: string;
+  createdAt: string;
+}
+
 export type RemoteCameraSessionStatus = "active" | "ended";
 
 export interface RemoteCameraSession {

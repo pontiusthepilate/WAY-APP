@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, legibleText, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { searchByWayId } from "../api/search";
+import { startConversation } from "../api/messages";
 import { safeBack } from "../lib/navigation";
 import { MiniProfileModal } from "../components/MiniProfileModal";
 import type { NearbyResult } from "../types";
@@ -56,6 +57,13 @@ export default function ScanScreen() {
     router.replace({ pathname: "/request-camera", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
   }
 
+  async function openMessage(result: NearbyResult) {
+    if (!activeProfile) return;
+    setFound(null);
+    const conversation = await startConversation(activeProfile.id, result.id);
+    router.replace(`/messages/${conversation.id}`);
+  }
+
   return (
     <View style={styles.container}>
       {permission?.granted ? (
@@ -103,6 +111,7 @@ export default function ScanScreen() {
         onClose={resumeScanning}
         onSendRequest={openRequest}
         onRequestCamera={openCameraRequest}
+        onMessage={openMessage}
       />
     </View>
   );

@@ -28,6 +28,7 @@ import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
 import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
 import { searchAddress, searchByWayId, searchLocation, searchNearby } from "../../api/search";
+import { startConversation } from "../../api/messages";
 import { updateVisibility } from "../../api/profiles";
 import type { NearbyResult, ResultView, SearchMode } from "../../types";
 import { ApiError } from "../../api/client";
@@ -158,6 +159,13 @@ export default function SearchScreen() {
   function openCameraRequest(result: NearbyResult) {
     setSelected(null);
     router.push({ pathname: "/request-camera", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
+  }
+
+  async function openMessage(result: NearbyResult) {
+    if (!activeProfile) return;
+    setSelected(null);
+    const conversation = await startConversation(activeProfile.id, result.id);
+    router.push(`/messages/${conversation.id}`);
   }
 
   return (
@@ -309,6 +317,7 @@ export default function SearchScreen() {
         onClose={() => setSelected(null)}
         onSendRequest={openRequest}
         onRequestCamera={openCameraRequest}
+        onMessage={openMessage}
       />
     </View>
   );
