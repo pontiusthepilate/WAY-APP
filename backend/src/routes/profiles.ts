@@ -18,7 +18,9 @@ const createProfileBody = z.object({
 
 const updateProfileBody = z.object({
   displayName: z.string().min(1).max(40).optional(),
-  displayPictureUrl: z.string().url().optional(),
+  // null explicitly clears the picture (removing it) — plain omission leaves
+  // the existing value untouched.
+  displayPictureUrl: z.string().url().nullable().optional(),
   bio: z.string().max(280).optional(),
   categories: z.array(z.string().min(1).max(30)).max(10).optional(),
 });

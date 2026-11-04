@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
-import { Dimensions, FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { PostGridItem } from "../../components/PostGridItem";
@@ -9,6 +10,8 @@ import { getProfilePosts } from "../../api/posts";
 import { getScheduledLiveSessions, startLiveSession } from "../../api/live";
 import { getIncomingCameraRequests } from "../../api/remoteCamera";
 import { getIncomingWayRequests } from "../../api/wayRequests";
+import { updateProfile } from "../../api/profiles";
+import { uploadMedia } from "../../api/uploads";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import type { LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../types";
 
@@ -17,7 +20,7 @@ const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { activeProfile, profiles, setActiveProfileId, signOut } = useSession();
+  const { activeProfile, profiles, setActiveProfileId, signOut, refreshProfiles } = useSession();
 
   async function handleSignOut() {
     await signOut();
@@ -27,6 +30,8 @@ export default function ProfileScreen() {
   const [scheduled, setScheduled] = useState<LiveSession[]>([]);
   const [cameraRequests, setCameraRequests] = useState<RemoteCameraRequest[]>([]);
   const [wayRequests, setWayRequests] = useState<WayRequest[]>([]);
+  const [pictureMenuOpen, setPictureMenuOpen] = useState(false);
+  const [pictureSaving, setPictureSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
@@ -57,6 +62,40 @@ export default function ProfileScreen() {
     router.push(`/live/${sessionId}`);
   }
 
+  async function handlePickPicture() {
+    setPictureMenuOpen(false);
+    if (!activeProfile) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.85,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setPictureSaving(true);
+    try {
+      const uploaded = await uploadMedia({ uri: result.assets[0].uri, type: "image" });
+      await updateProfile(activeProfile.id, { displayPictureUrl: uploaded.url });
+      await refreshProfiles();
+    } finally {
+      setPictureSaving(false);
+    }
+  }
+
+  async function handleRemovePicture() {
+    setPictureMenuOpen(false);
+    if (!activeProfile) return;
+    setPictureSaving(true);
+    try {
+      await updateProfile(activeProfile.id, { displayPictureUrl: null });
+      await refreshProfiles();
+    } finally {
+      setPictureSaving(false);
+    }
+  }
+
   if (!activeProfile) return null;
 
   return (
@@ -71,13 +110,27 @@ export default function ProfileScreen() {
       ListHeaderComponent={
         <View>
           <View style={styles.header}>
-            {activeProfile.displayPictureUrl ? (
-              <Image source={{ uri: activeProfile.displayPictureUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{activeProfile.displayName.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <View style={styles.avatarWrap}>
+              {activeProfile.displayPictureUrl ? (
+                <Image source={{ uri: activeProfile.displayPictureUrl }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarInitial}>{activeProfile.displayName.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
+              <Pressable
+                style={styles.avatarMenuBadge}
+                onPress={() => setPictureMenuOpen(true)}
+                hitSlop={8}
+                disabled={pictureSaving}
+              >
+                {pictureSaving ? (
+                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
+                ) : (
+                  <Ionicons name="chevron-down" size={14} color={colors.textOnPrimary} />
+                )}
+              </Pressable>
+            </View>
             <Text style={styles.name}>
               {activeProfile.displayName}
               {activeProfile.isVerified ? " ✓" : ""}
@@ -190,6 +243,23 @@ export default function ProfileScreen() {
       )}
       ListEmptyComponent={<Text style={styles.empty}>No posts yet — tap New Post to share something.</Text>}
       />
+
+      <Modal visible={pictureMenuOpen} animationType="fade" transparent onRequestClose={() => setPictureMenuOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setPictureMenuOpen(false)}>
+          <View style={styles.menuCard}>
+            <Pressable style={styles.menuItem} onPress={handlePickPicture}>
+              <Ionicons name="image-outline" size={18} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{activeProfile.displayPictureUrl ? "Edit photo" : "Add photo"}</Text>
+            </Pressable>
+            {activeProfile.displayPictureUrl && (
+              <Pressable style={styles.menuItem} onPress={handleRemovePicture}>
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>Remove photo</Text>
+              </Pressable>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -208,9 +278,33 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   listPadding: { paddingBottom: 90 },
   header: { alignItems: "center", paddingTop: spacing.xl, paddingHorizontal: spacing.lg },
+  avatarWrap: { width: 88, height: 88 },
   avatar: { width: 88, height: 88, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarInitial: { color: colors.primaryDark, fontWeight: "700", fontSize: 32 },
+  avatarMenuBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuBackdrop: { flex: 1, backgroundColor: "rgba(16, 42, 49, 0.35)", justifyContent: "center", alignItems: "center" },
+  menuCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingVertical: spacing.xs,
+    width: 220,
+  },
+  menuItem: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md, paddingHorizontal: spacing.md },
+  menuItemText: { ...typography.body, color: colors.textPrimary, fontWeight: "600" },
+  menuItemTextDanger: { color: colors.danger },
   name: { ...typography.h2, color: colors.textPrimary, marginTop: spacing.sm },
   wayRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   way: { ...typography.body, color: colors.textSecondary },
