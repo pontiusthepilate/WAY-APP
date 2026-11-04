@@ -6,7 +6,7 @@ import { colors, radii, spacing, typography } from "../theme/theme";
 import { verifyOtp } from "../api/auth";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
-import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { OceanWavesBackground } from "../components/OceanWavesBackground";
 import { DotOutline } from "../components/DotOutline";
 import { findCountryByIdentifier } from "../lib/countries";
 
@@ -48,7 +48,7 @@ export default function OtpScreen() {
 
   return (
     <View style={styles.container}>
-      <SkyOceanBackground tone="medium" />
+      <OceanWavesBackground source={require("../../assets/otp-waves.mp4")} tone="medium" />
       <View style={styles.titleRow}>
         <Ionicons name="keypad-outline" size={20} color={colors.textPrimary} />
         <Text style={styles.title}>Enter your code</Text>

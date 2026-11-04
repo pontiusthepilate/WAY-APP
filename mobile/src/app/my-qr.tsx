@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, legibleText, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { safeBack } from "../lib/navigation";
-import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { OceanWavesBackground } from "../components/OceanWavesBackground";
 
 const QR_SIZE = 220;
 
@@ -18,7 +18,7 @@ export default function MyQrScreen() {
 
   return (
     <View style={styles.container}>
-      <SkyOceanBackground tone="deep" />
+      <OceanWavesBackground source={require("../../assets/my-qr-waves.mp4")} tone="deep" />
 
       <Pressable style={[styles.close, { top: spacing.lg + insets.top }]} onPress={() => safeBack()} hitSlop={12}>
         <Ionicons name="close" size={26} color={colors.textOnPrimary} />

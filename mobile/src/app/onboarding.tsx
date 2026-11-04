@@ -12,7 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, legibleText, radii, spacing, typography } from "../theme/theme";
-import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { OceanWavesBackground } from "../components/OceanWavesBackground";
 import { DotOutline } from "../components/DotOutline";
 import { markOnboardingSeen } from "../lib/onboarding";
 
@@ -70,7 +70,7 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <SkyOceanBackground tone="deep" />
+      <OceanWavesBackground source={require("../../assets/onboarding-waves.mp4")} tone="deep" />
 
       {!isLast && (
         <Pressable style={styles.skip} onPress={finish} hitSlop={12}>

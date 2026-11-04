@@ -46,7 +46,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <OceanWavesBackground />
+      <OceanWavesBackground source={require("../../assets/ocean-waves-welcome.mp4")} tone="deep" />
       <Image source={require("../../assets/way-logo-lockup.png")} style={styles.logo} resizeMode="contain" />
 
       <Text style={styles.tagline}>Find your WAY to anyone, anywhere.</Text>
