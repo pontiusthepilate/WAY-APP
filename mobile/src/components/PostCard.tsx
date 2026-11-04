@@ -1,10 +1,20 @@
-import React, { useEffect, useRef } from "react";
-import { Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { colors, radii, spacing, typography } from "../theme/theme";
-import type { Post } from "../types";
+import type { Post, ReactionType } from "../types";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
-import { registerShare, registerView, toggleLike } from "../api/posts";
+import { getReactionBreakdown, registerShare, registerView, toggleLike } from "../api/posts";
+
+const REACTION_EMOJI: Record<ReactionType, string> = {
+  like: "❤️",
+  love: "😍",
+  haha: "😂",
+  wow: "😮",
+  sad: "😢",
+  angry: "😡",
+};
+const REACTION_ORDER: ReactionType[] = ["like", "love", "haha", "wow", "sad", "angry"];
 
 interface Props {
   post: Post;
@@ -14,6 +24,7 @@ interface Props {
 
 export function PostCard({ post, onChange, onOpenComments }: Props) {
   const viewedRef = useRef(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (viewedRef.current) return;
@@ -21,14 +32,31 @@ export function PostCard({ post, onChange, onOpenComments }: Props) {
     registerView(post.id).catch(() => {});
   }, [post.id]);
 
-  async function handleLike() {
-    const optimistic = { ...post, viewerLiked: !post.viewerLiked, likesCount: post.likesCount + (post.viewerLiked ? -1 : 1) };
+  async function handleReact(type: ReactionType) {
+    setPickerOpen(false);
+    const wasSameType = post.viewerReactionType === type;
+    const optimistic = {
+      ...post,
+      viewerLiked: !wasSameType,
+      viewerReactionType: wasSameType ? null : type,
+      likesCount: post.likesCount + (wasSameType ? -1 : post.viewerLiked ? 0 : 1),
+    };
     onChange(optimistic);
     try {
-      const result = await toggleLike(post.id, post.profileId);
-      onChange({ ...optimistic, viewerLiked: result.liked, likesCount: result.likesCount });
+      const result = await toggleLike(post.id, post.profileId, type);
+      onChange({ ...optimistic, viewerLiked: result.liked, viewerReactionType: result.reactionType, likesCount: result.likesCount });
     } catch {
       onChange(post);
+    }
+  }
+
+  async function handleShowBreakdown() {
+    try {
+      const breakdown = await getReactionBreakdown(post.id);
+      const lines = REACTION_ORDER.filter((t) => breakdown[t]).map((t) => `${REACTION_EMOJI[t]} ${breakdown[t]}`);
+      Alert.alert("Reactions", lines.length ? lines.join("   ") : "No reactions yet.");
+    } catch {
+      // ignore — not worth surfacing an error for a secondary info view
     }
   }
 
@@ -77,11 +105,25 @@ export function PostCard({ post, onChange, onOpenComments }: Props) {
         </>
       )}
 
+      {pickerOpen && (
+        <View style={styles.reactionPicker}>
+          {REACTION_ORDER.map((type) => (
+            <Pressable key={type} style={styles.reactionPickerItem} onPress={() => handleReact(type)}>
+              <Text style={styles.reactionPickerEmoji}>{REACTION_EMOJI[type]}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       <View style={styles.actionRow}>
-        <Pressable style={styles.action} onPress={handleLike}>
-          <Text style={[styles.actionIcon, post.viewerLiked && styles.actionIconActive]}>{post.viewerLiked ? "♥" : "♡"}</Text>
-          <Text style={styles.actionCount}>{post.likesCount}</Text>
-        </Pressable>
+        <View style={styles.action}>
+          <Pressable onPress={() => handleReact("like")} onLongPress={() => setPickerOpen(true)}>
+            <Text style={styles.actionIcon}>{post.viewerReactionType ? REACTION_EMOJI[post.viewerReactionType] : "♡"}</Text>
+          </Pressable>
+          <Pressable onPress={handleShowBreakdown} hitSlop={6}>
+            <Text style={styles.actionCount}>{post.likesCount}</Text>
+          </Pressable>
+        </View>
         <Pressable style={styles.action} onPress={() => onOpenComments(post)}>
           <Text style={styles.actionIcon}>💬</Text>
           <Text style={styles.actionCount}>{post.commentsCount}</Text>
@@ -133,6 +175,20 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", paddingHorizontal: spacing.md, marginTop: spacing.sm, gap: spacing.lg },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
   actionIcon: { fontSize: 20, color: colors.textSecondary },
-  actionIconActive: { color: colors.danger },
   actionCount: { ...typography.caption, color: colors.textSecondary },
+  reactionPicker: {
+    flexDirection: "row",
+    alignSelf: "flex-start",
+    marginLeft: spacing.md,
+    marginTop: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    gap: spacing.xs,
+  },
+  reactionPickerItem: { padding: 4 },
+  reactionPickerEmoji: { fontSize: 22 },
 });

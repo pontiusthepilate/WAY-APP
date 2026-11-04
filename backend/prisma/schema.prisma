@@ -120,10 +120,16 @@ model Post {
   @@index([createdAt])
 }
 
+// One reaction per (post, profile) — the single unique row's "type" field
+// is what expanded this from a plain like into a reaction, so a switch
+// between emoji is an update to the existing row rather than a new one.
+// Post.likesCount is the total reaction count of any type, not "likes"
+// specifically — the field name stayed as-is since it's read everywhere.
 model Like {
   id        String   @id @default(cuid())
   postId    String
   profileId String
+  type      String   @default("like") // "like" | "love" | "haha" | "wow" | "sad" | "angry"
   createdAt DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)

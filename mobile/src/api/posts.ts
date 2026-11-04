@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Comment, Post, PostType } from "../types";
+import type { Comment, Post, PostType, ReactionType } from "../types";
 
 interface FeedPage {
   posts: Post[];
@@ -33,8 +33,15 @@ export function deletePost(id: string) {
   return api.del(`/posts/${id}`);
 }
 
-export function toggleLike(postId: string, profileId: string) {
-  return api.post<{ liked: boolean; likesCount: number }>(`/posts/${postId}/like`, { profileId });
+export function toggleLike(postId: string, profileId: string, type: ReactionType = "like") {
+  return api.post<{ liked: boolean; reactionType: ReactionType | null; likesCount: number }>(`/posts/${postId}/like`, {
+    profileId,
+    type,
+  });
+}
+
+export function getReactionBreakdown(postId: string) {
+  return api.get<Partial<Record<ReactionType, number>>>(`/posts/${postId}/reactions`);
 }
 
 export function registerView(postId: string) {

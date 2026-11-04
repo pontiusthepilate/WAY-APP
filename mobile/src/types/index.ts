@@ -64,8 +64,11 @@ export interface Post {
   sharesCount: number;
   viewsCount: number;
   viewerLiked: boolean;
+  viewerReactionType: ReactionType | null;
   createdAt: string;
 }
+
+export type ReactionType = "like" | "love" | "haha" | "wow" | "sad" | "angry";
 
 export interface Comment {
   id: string;

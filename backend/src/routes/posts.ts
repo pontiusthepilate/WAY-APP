@@ -18,20 +18,21 @@ const feedQuery = z.object({
   viewerProfileId: z.string().optional(),
 });
 
-const likeBody = z.object({ profileId: z.string() });
+const REACTION_TYPES = ["like", "love", "haha", "wow", "sad", "angry"] as const;
+const likeBody = z.object({ profileId: z.string(), type: z.enum(REACTION_TYPES).default("like") });
 const commentBody = z.object({ profileId: z.string(), text: z.string().min(1).max(1000) });
 
 
 async function withViewerLiked<T extends { id: string }>(posts: T[], viewerProfileId?: string) {
   if (!viewerProfileId || posts.length === 0) {
-    return posts.map((p) => ({ ...p, viewerLiked: false }));
+    return posts.map((p) => ({ ...p, viewerLiked: false, viewerReactionType: null as string | null }));
   }
-  const liked = await prisma.like.findMany({
+  const reactions = await prisma.like.findMany({
     where: { profileId: viewerProfileId, postId: { in: posts.map((p) => p.id) } },
-    select: { postId: true },
+    select: { postId: true, type: true },
   });
-  const likedSet = new Set(liked.map((l) => l.postId));
-  return posts.map((p) => ({ ...p, viewerLiked: likedSet.has(p.id) }));
+  const byPostId = new Map(reactions.map((r) => [r.postId, r.type]));
+  return posts.map((p) => ({ ...p, viewerLiked: byPostId.has(p.id), viewerReactionType: byPostId.get(p.id) ?? null }));
 }
 
 export async function postRoutes(app: FastifyInstance) {
@@ -48,7 +49,7 @@ export async function postRoutes(app: FastifyInstance) {
       data: body,
       include: { profile: { select: PROFILE_SUMMARY_SELECT } },
     });
-    reply.status(201).send({ ...post, viewerLiked: false });
+    reply.status(201).send({ ...post, viewerLiked: false, viewerReactionType: null });
   });
 
   // Global reverse-chronological feed (no follow-graph yet — see README).
@@ -103,30 +104,48 @@ export async function postRoutes(app: FastifyInstance) {
     reply.status(204).send();
   });
 
-  // Toggles a like from the given profile; returns the resulting state.
+  // Toggles (or switches) a reaction from the given profile. Tapping the
+  // same type again removes it; picking a different type switches the
+  // existing row in place (no counter change, still one reaction per
+  // profile per post); no prior reaction creates one.
   app.post("/posts/:id/like", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { userId } = requireUser(req);
     const { id } = req.params as { id: string };
-    const { profileId } = likeBody.parse(req.body);
+    const { profileId, type } = likeBody.parse(req.body);
     await assertOwnsProfile(userId, profileId);
 
     const existing = await prisma.like.findUnique({
       where: { postId_profileId: { postId: id, profileId } },
     });
 
-    if (existing) {
+    if (existing && existing.type === type) {
       const [, post] = await prisma.$transaction([
         prisma.like.delete({ where: { id: existing.id } }),
         prisma.post.update({ where: { id }, data: { likesCount: { decrement: 1 } } }),
       ]);
-      return reply.send({ liked: false, likesCount: post.likesCount });
+      return reply.send({ liked: false, reactionType: null, likesCount: post.likesCount });
+    }
+
+    if (existing) {
+      // Switching type doesn't change the count, so no transaction needed.
+      await prisma.like.update({ where: { id: existing.id }, data: { type } });
+      const post = await prisma.post.findUniqueOrThrow({ where: { id } });
+      return reply.send({ liked: true, reactionType: type, likesCount: post.likesCount });
     }
 
     const [, post] = await prisma.$transaction([
-      prisma.like.create({ data: { postId: id, profileId } }),
+      prisma.like.create({ data: { postId: id, profileId, type } }),
       prisma.post.update({ where: { id }, data: { likesCount: { increment: 1 } } }),
     ]);
-    reply.send({ liked: true, likesCount: post.likesCount });
+    reply.send({ liked: true, reactionType: type, likesCount: post.likesCount });
+  });
+
+  // Reaction breakdown by type — fetched on demand (e.g. tapping the count),
+  // not included in every feed load.
+  app.get("/posts/:id/reactions", { onRequest: [app.authenticate] }, async (req) => {
+    const { id } = req.params as { id: string };
+    const groups = await prisma.like.groupBy({ by: ["type"], where: { postId: id }, _count: { type: true } });
+    return Object.fromEntries(groups.map((g) => [g.type, g._count.type]));
   });
 
   app.post("/posts/:id/view", async (req, reply) => {
