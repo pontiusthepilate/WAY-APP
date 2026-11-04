@@ -18,6 +18,13 @@ const feedQuery = z.object({
   viewerProfileId: z.string().optional(),
 });
 
+const discoverQuery = z.object({
+  profileId: z.string(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+});
+const DISCOVER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 const REACTION_TYPES = ["like", "love", "haha", "wow", "sad", "angry"] as const;
 const likeBody = z.object({ profileId: z.string(), type: z.enum(REACTION_TYPES).default("like") });
 const commentBody = z.object({ profileId: z.string(), text: z.string().min(1).max(1000) });
@@ -66,6 +73,33 @@ export async function postRoutes(app: FastifyInstance) {
     });
 
     const withLikes = await withViewerLiked(posts, q.viewerProfileId);
+    return { posts: withLikes, nextCursor: posts.length === q.limit ? posts[posts.length - 1].id : null };
+  });
+
+  // Posts from profiles the viewer doesn't follow — a simple recent-popularity
+  // heuristic, not a ranking model. Excludes the viewer's own posts, anyone
+  // they already follow, and anyone blocked/muted (getSuppressedProfileIds).
+  app.get("/posts/discover", { onRequest: [app.authenticate] }, async (req) => {
+    const q = discoverQuery.parse(req.query);
+    const [followed, suppressed] = await Promise.all([
+      prisma.follow.findMany({ where: { followerId: q.profileId }, select: { followingId: true } }),
+      getSuppressedProfileIds(q.profileId),
+    ]);
+    const excludeIds = [...new Set([q.profileId, ...followed.map((f) => f.followingId), ...suppressed])];
+
+    const posts = await prisma.post.findMany({
+      take: q.limit,
+      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      where: {
+        profileId: { notIn: excludeIds },
+        createdAt: { gte: new Date(Date.now() - DISCOVER_WINDOW_MS) },
+        profile: { isVisible: true },
+      },
+      orderBy: [{ likesCount: "desc" }, { createdAt: "desc" }],
+      include: { profile: { select: PROFILE_SUMMARY_SELECT } },
+    });
+
+    const withLikes = await withViewerLiked(posts, q.profileId);
     return { posts: withLikes, nextCursor: posts.length === q.limit ? posts[posts.length - 1].id : null };
   });
 

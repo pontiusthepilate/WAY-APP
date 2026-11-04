@@ -25,6 +25,12 @@ export function getProfilePosts(profileId: string, input: { viewerProfileId: str
   return api.get<FeedPage>(`/profiles/${profileId}/posts${qs(input)}`);
 }
 
+// Posts from profiles the viewer doesn't follow — a recent-popularity
+// surface, separate from the chronological following feed.
+export function getDiscoverFeed(input: { profileId: string; cursor?: string; limit?: number }) {
+  return api.get<FeedPage>(`/posts/discover${qs(input)}`);
+}
+
 export function createPost(input: { profileId: string; type: PostType; mediaUrl?: string; caption?: string }) {
   return api.post<Post>("/posts", input);
 }

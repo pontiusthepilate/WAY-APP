@@ -10,7 +10,7 @@ import { LiveRail } from "../../components/LiveRail";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { useSession } from "../../context/SessionContext";
 import { useAutoScroll } from "../../lib/useAutoScroll";
-import { getFeed } from "../../api/posts";
+import { getDiscoverFeed, getFeed } from "../../api/posts";
 import { getActiveLiveSessions } from "../../api/live";
 import { getUnreadNotificationCount } from "../../api/notifications";
 import type { AutoScrollSpeed, LiveSession, Post } from "../../types";
@@ -18,6 +18,8 @@ import type { AutoScrollSpeed, LiveSession, Post } from "../../types";
 // Not as time-sensitive as a chat thread, so a longer interval than
 // live/[id].tsx's 4s chat poll is plenty.
 const UNREAD_POLL_MS = 15000;
+
+type FeedTab = "following" | "discover";
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -27,6 +29,7 @@ export default function FeedScreen() {
   const [speed, setSpeed] = useState<AutoScrollSpeed>("off");
   const autoScrollHandlers = useAutoScroll(listRef, speed);
 
+  const [tab, setTab] = useState<FeedTab>("following");
   const [posts, setPosts] = useState<Post[]>([]);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -47,19 +50,27 @@ export default function FeedScreen() {
     if (!activeProfile) return;
     setError(null);
     try {
-      const [page, active] = await Promise.all([
-        getFeed({ viewerProfileId: activeProfile.id, limit: 20 }),
-        getActiveLiveSessions().catch(() => []),
-      ]);
-      setPosts(page.posts);
-      setCursor(page.nextCursor);
-      setLiveSessions(active);
+      if (tab === "following") {
+        const [page, active] = await Promise.all([
+          getFeed({ viewerProfileId: activeProfile.id, limit: 20 }),
+          getActiveLiveSessions().catch(() => []),
+        ]);
+        setPosts(page.posts);
+        setCursor(page.nextCursor);
+        setLiveSessions(active);
+      } else {
+        const page = await getDiscoverFeed({ profileId: activeProfile.id, limit: 20 });
+        setPosts(page.posts);
+        setCursor(page.nextCursor);
+        setLiveSessions([]);
+      }
     } catch {
       setError("Couldn't load the feed. Pull to retry.");
     }
-  }, [activeProfile]);
+  }, [activeProfile, tab]);
 
-  // Loads on mount and again whenever the tab regains focus (e.g. right after posting).
+  // Loads on mount, whenever the tab (following/discover) changes, and
+  // again whenever the screen regains focus (e.g. right after posting).
   useFocusEffect(
     useCallback(() => {
       loadFirstPage();
@@ -76,7 +87,10 @@ export default function FeedScreen() {
     if (!activeProfile || !cursor || loading) return;
     setLoading(true);
     try {
-      const page = await getFeed({ viewerProfileId: activeProfile.id, cursor, limit: 20 });
+      const page =
+        tab === "following"
+          ? await getFeed({ viewerProfileId: activeProfile.id, cursor, limit: 20 })
+          : await getDiscoverFeed({ profileId: activeProfile.id, cursor, limit: 20 });
       setPosts((prev) => [...prev, ...page.posts]);
       setCursor(page.nextCursor);
     } catch {
@@ -111,6 +125,15 @@ export default function FeedScreen() {
             <Text style={styles.composeButtonText}>+ Post</Text>
           </Pressable>
         </View>
+      </View>
+
+      <View style={styles.tabRow}>
+        <Pressable style={[styles.tabPill, tab === "following" && styles.tabPillActive]} onPress={() => setTab("following")}>
+          <Text style={[styles.tabLabel, tab === "following" && styles.tabLabelActive]}>Following</Text>
+        </Pressable>
+        <Pressable style={[styles.tabPill, tab === "discover" && styles.tabPillActive]} onPress={() => setTab("discover")}>
+          <Text style={[styles.tabLabel, tab === "discover" && styles.tabLabelActive]}>Discover</Text>
+        </Pressable>
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
@@ -181,6 +204,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   composeButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
+  tabRow: { flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.lg, marginBottom: spacing.xs },
+  tabPill: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: 999, backgroundColor: colors.surfaceAlt },
+  tabPillActive: { backgroundColor: colors.primary },
+  tabLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "700" },
+  tabLabelActive: { color: colors.textOnPrimary },
   error: { color: colors.danger, textAlign: "center", ...typography.caption, marginBottom: spacing.xs },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
