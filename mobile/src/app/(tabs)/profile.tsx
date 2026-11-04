@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { Dimensions, FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { PostGridItem } from "../../components/PostGridItem";
 import { useSession } from "../../context/SessionContext";
@@ -81,7 +82,10 @@ export default function ProfileScreen() {
               {activeProfile.displayName}
               {activeProfile.isVerified ? " ✓" : ""}
             </Text>
-            <Text style={styles.way}>WAY/{activeProfile.wayId}</Text>
+            <Pressable style={styles.wayRow} onPress={() => router.push("/my-qr")} hitSlop={8}>
+              <Text style={styles.way}>WAY/{activeProfile.wayId}</Text>
+              <Ionicons name="qr-code-outline" size={16} color={colors.textSecondary} />
+            </Pressable>
             {activeProfile.bio && <Text style={styles.bio}>{activeProfile.bio}</Text>}
 
             <View style={styles.statsRow}>
@@ -208,6 +212,7 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarInitial: { color: colors.primaryDark, fontWeight: "700", fontSize: 32 },
   name: { ...typography.h2, color: colors.textPrimary, marginTop: spacing.sm },
+  wayRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   way: { ...typography.body, color: colors.textSecondary },
   bio: { ...typography.body, color: colors.textPrimary, textAlign: "center", marginTop: spacing.xs },
   statsRow: { flexDirection: "row", gap: spacing.xl, marginTop: spacing.md },

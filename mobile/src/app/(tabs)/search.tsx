@@ -255,12 +255,19 @@ export default function SearchScreen() {
         {mode !== "wayid" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
 
         {mode !== "nearby" && (
-          <DotOutline radius={radii.pill} tone="onDark">
-            <Pressable style={styles.searchButton} onPress={runSearch}>
-              <Text style={styles.searchButtonText}>Search</Text>
-              <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
-            </Pressable>
-          </DotOutline>
+          <View style={styles.searchRow}>
+            <DotOutline radius={radii.pill} tone="onDark" style={styles.searchButtonWrap}>
+              <Pressable style={styles.searchButton} onPress={runSearch}>
+                <Text style={styles.searchButtonText}>Search</Text>
+                <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
+              </Pressable>
+            </DotOutline>
+            {mode === "wayid" && (
+              <Pressable style={styles.scanButton} onPress={() => router.push("/scan")} hitSlop={8}>
+                <Ionicons name="qr-code-outline" size={22} color={colors.primaryDark} />
+              </Pressable>
+            )}
+          </View>
         )}
 
         <ViewToggle value={view} onChange={setView} />
@@ -339,6 +346,8 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
   },
+  searchRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  searchButtonWrap: { flex: 1 },
   searchButton: {
     flexDirection: "row",
     gap: spacing.xs,
@@ -347,6 +356,16 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.25)",
     borderRadius: radii.pill,
     paddingVertical: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
