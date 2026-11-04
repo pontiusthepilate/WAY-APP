@@ -284,8 +284,8 @@ const styles = StyleSheet.create({
   avatarInitial: { color: colors.primaryDark, fontWeight: "700", fontSize: 32 },
   avatarMenuBadge: {
     position: "absolute",
-    bottom: -2,
-    right: -2,
+    bottom: 2,
+    right: 2,
     width: 26,
     height: 26,
     borderRadius: radii.pill,
