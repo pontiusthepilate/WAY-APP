@@ -381,3 +381,20 @@ model Status {
 
   @@index([profileId, expiresAt])
 }
+
+// A persisted, in-app record of an event worth notifying someone about —
+// written alongside (not instead of) the existing push-notify call at each
+// trigger point, so push stays "fire and forget" while this is what the
+// notifications center actually reads/paginates/marks-read.
+model Notification {
+  id             String   @id @default(cuid())
+  profileId      String // recipient
+  type           String // "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live"
+  actorProfileId String?
+  postId         String?
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([profileId, createdAt])
+  @@index([profileId, read])
+}

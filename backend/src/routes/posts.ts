@@ -137,6 +137,11 @@ export async function postRoutes(app: FastifyInstance) {
       prisma.like.create({ data: { postId: id, profileId, type } }),
       prisma.post.update({ where: { id }, data: { likesCount: { increment: 1 } } }),
     ]);
+    if (post.profileId !== profileId) {
+      await prisma.notification.create({
+        data: { profileId: post.profileId, type: "like", actorProfileId: profileId, postId: id },
+      });
+    }
     reply.send({ liked: true, reactionType: type, likesCount: post.likesCount });
   });
 
@@ -186,10 +191,15 @@ export async function postRoutes(app: FastifyInstance) {
     const body = commentBody.parse(req.body);
     await assertOwnsProfile(userId, body.profileId);
 
-    const [comment] = await prisma.$transaction([
+    const [comment, post] = await prisma.$transaction([
       prisma.comment.create({ data: { postId: id, profileId: body.profileId, text: body.text } }),
       prisma.post.update({ where: { id }, data: { commentsCount: { increment: 1 } } }),
     ]);
+    if (post.profileId !== body.profileId) {
+      await prisma.notification.create({
+        data: { profileId: post.profileId, type: "comment", actorProfileId: body.profileId, postId: id },
+      });
+    }
     const profile = await prisma.profile.findUnique({ where: { id: body.profileId }, select: PROFILE_SUMMARY_SELECT });
     reply.status(201).send({ ...comment, profile });
   });

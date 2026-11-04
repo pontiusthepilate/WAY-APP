@@ -43,6 +43,7 @@ export async function remoteCameraRoutes(app: FastifyInstance) {
       body.message ?? "Tap to review the request",
       { remoteCameraRequestId: request.id }
     );
+    await prisma.notification.create({ data: { profileId: target.id, type: "camera_request", actorProfileId: requester.id } });
 
     reply.status(201).send(await withRequester(request));
   });

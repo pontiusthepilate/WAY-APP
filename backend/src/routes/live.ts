@@ -12,10 +12,18 @@ const createSessionBody = z.object({
 });
 const chatBody = z.object({ profileId: z.string(), text: z.string().min(1).max(500) });
 
-// Fans a notification out to everyone who follows `broadcasterProfileId`.
+// Fans a notification out to everyone who follows `broadcasterProfileId` —
+// both a push (fire-and-forget) and a persisted in-app Notification row per
+// follower, written with createMany since this list can be large.
 async function notifyFollowers(broadcasterProfileId: string, title: string, body: string, data: Record<string, unknown>) {
   const followers = await prisma.follow.findMany({ where: { followingId: broadcasterProfileId }, select: { followerId: true } });
-  await notifyProfiles(followers.map((f) => f.followerId), title, body, data);
+  const followerIds = followers.map((f) => f.followerId);
+  await notifyProfiles(followerIds, title, body, data);
+  if (followerIds.length) {
+    await prisma.notification.createMany({
+      data: followerIds.map((profileId) => ({ profileId, type: "go_live", actorProfileId: broadcasterProfileId })),
+    });
+  }
 }
 
 export async function liveRoutes(app: FastifyInstance) {

@@ -20,6 +20,7 @@ import { remoteCameraRoutes } from "./routes/remoteCamera";
 import { messageRoutes } from "./routes/messages";
 import { safetyRoutes } from "./routes/safety";
 import { statusRoutes } from "./routes/status";
+import { notificationRoutes } from "./routes/notifications";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -70,6 +71,7 @@ async function main() {
   await app.register(messageRoutes);
   await app.register(safetyRoutes);
   await app.register(statusRoutes);
+  await app.register(notificationRoutes);
 
   // Reached only when no API route or static file matched — i.e. a browser
   // navigating straight to (or reloading) a client-side route like /feed.
