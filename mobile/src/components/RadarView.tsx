@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line } from "react-native-svg";
+import { LocationPulse } from "./LocationPulse";
 import { colors, radii, typography } from "../theme/theme";
 import type { NearbyResult } from "../types";
 
@@ -64,7 +65,9 @@ export function RadarView({ results, radiusMeters, size, onSelect }: Props) {
         ]}
       />
 
-      <View style={[styles.centerDot, { left: center - 7, top: center - 7 }]} />
+      <LocationPulse style={[styles.centerDotWrap, { left: center - 7, top: center - 7 }]}>
+        <View style={styles.centerDot} />
+      </LocationPulse>
 
       {results.map((r) => {
         const clampedDistance = Math.min(r.distanceMeters ?? 0, radiusMeters);
@@ -107,8 +110,10 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     borderLeftColor: "transparent",
   },
-  centerDot: {
+  centerDotWrap: {
     position: "absolute",
+  },
+  centerDot: {
     width: 14,
     height: 14,
     borderRadius: 7,
