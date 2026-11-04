@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, legibleText, radii, spacing, typography } from "../theme/theme";
 import { requestOtp } from "../api/auth";
 import { ApiError } from "../api/client";
-import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { OceanWavesBackground } from "../components/OceanWavesBackground";
 import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../components/CountryCodePicker";
 import { DotOutline } from "../components/DotOutline";
 import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
@@ -46,7 +46,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <SkyOceanBackground tone="deep" />
+      <OceanWavesBackground />
       <Image source={require("../../assets/way-logo-lockup.png")} style={styles.logo} resizeMode="contain" />
 
       <Text style={styles.tagline}>Find your WAY to anyone, anywhere.</Text>
