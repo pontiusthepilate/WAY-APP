@@ -1,7 +1,8 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, typography } from "../../theme/theme";
 import { PostCard } from "../../components/PostCard";
 import { WayButton } from "../../components/WayButton";
@@ -11,7 +12,12 @@ import { useSession } from "../../context/SessionContext";
 import { useAutoScroll } from "../../lib/useAutoScroll";
 import { getFeed } from "../../api/posts";
 import { getActiveLiveSessions } from "../../api/live";
+import { getUnreadNotificationCount } from "../../api/notifications";
 import type { AutoScrollSpeed, LiveSession, Post } from "../../types";
+
+// Not as time-sensitive as a chat thread, so a longer interval than
+// live/[id].tsx's 4s chat poll is plenty.
+const UNREAD_POLL_MS = 15000;
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -27,6 +33,15 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!activeProfile) return;
+    const load = () => getUnreadNotificationCount(activeProfile.id).then((r) => setUnreadCount(r.count)).catch(() => {});
+    load();
+    const poll = setInterval(load, UNREAD_POLL_MS);
+    return () => clearInterval(poll);
+  }, [activeProfile]);
 
   const loadFirstPage = useCallback(async () => {
     if (!activeProfile) return;
@@ -81,6 +96,14 @@ export default function FeedScreen() {
       <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <Text style={styles.headerTitle}>WAY</Text>
         <View style={styles.headerButtons}>
+          <Pressable style={styles.bellButton} onPress={() => router.push("/notifications")} hitSlop={8}>
+            <Ionicons name="notifications-outline" size={22} color={colors.primaryDark} />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+              </View>
+            )}
+          </Pressable>
           <Pressable style={styles.liveButton} onPress={() => router.push("/go-live")}>
             <Text style={styles.liveButtonText}>Go Live</Text>
           </Pressable>
@@ -129,7 +152,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   headerTitle: { ...typography.h1, color: colors.primaryDark },
-  headerButtons: { flexDirection: "row", gap: spacing.sm },
+  headerButtons: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  bellButton: { position: "relative" },
+  bellBadge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  bellBadgeText: { color: colors.textOnPrimary, fontSize: 10, fontWeight: "700" },
   liveButton: {
     backgroundColor: colors.danger,
     borderRadius: 999,

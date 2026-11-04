@@ -179,6 +179,19 @@ export interface Conversation {
   createdAt: string;
 }
 
+export type NotificationType = "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live";
+
+export interface AppNotification {
+  id: string;
+  profileId: string;
+  type: NotificationType;
+  actorProfileId: string | null;
+  actor: ProfileSummary | null;
+  postId: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
 export type RemoteCameraSessionStatus = "active" | "ended";
 
 export interface RemoteCameraSession {
