@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { sendOtp } from "../lib/notify";
 
 const OTP_TTL_MINUTES = 10;
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const FREE_PROFILE_LIMIT = 2;
 
 const identifierSchema = z.string().min(3).refine(
@@ -23,6 +24,23 @@ export async function authRoutes(app: FastifyInstance) {
   // that will act as the account's parent/key identifier.
   app.post("/auth/request-otp", async (req, reply) => {
     const { identifier } = requestOtpBody.parse(req.body);
+
+    // Real SMS/email sends cost money per request — a tight resend cooldown
+    // keeps a mistaken double-tap or a refresh loop from burning through
+    // provider credit, without needing full rate-limiting infrastructure.
+    const recent = await prisma.otpCode.findFirst({
+      where: {
+        identifier,
+        createdAt: { gt: new Date(Date.now() - OTP_RESEND_COOLDOWN_SECONDS * 1000) },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recent) {
+      const retryAfterSeconds = Math.ceil(
+        (recent.createdAt.getTime() + OTP_RESEND_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000
+      );
+      return reply.status(429).send({ error: "Please wait before requesting another code", retryAfterSeconds });
+    }
 
     const code = generateCode();
     await prisma.otpCode.create({
