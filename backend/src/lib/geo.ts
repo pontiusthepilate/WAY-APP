@@ -33,10 +33,11 @@ export async function findNearbyProfiles(params: {
   radiusMeters: number;
   category?: string;
   excludeProfileId?: string;
+  excludeProfileIds?: string[];
   visibilityColumn: "visibleToNearby" | "visibleToAddress" | "visibleToLocation";
   limit?: number;
 }): Promise<NearbyResult[]> {
-  const { lat, lng, radiusMeters, category, excludeProfileId, visibilityColumn, limit = 100 } = params;
+  const { lat, lng, radiusMeters, category, excludeProfileId, excludeProfileIds = [], visibilityColumn, limit = 100 } = params;
 
   // visibilityColumn is a TS-constrained literal (never user input), safe to interpolate.
   const rows = await prisma.$queryRawUnsafe<NearbyResult[]>(
@@ -53,14 +54,16 @@ export async function findNearbyProfiles(params: {
       AND ST_DWithin("location", ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $3)
       AND ($4::text IS NULL OR $4 = ANY("categories"))
       AND ($5::text IS NULL OR "id" != $5)
+      AND NOT ("id" = ANY($6::text[]))
     ORDER BY "distanceMeters" ASC
-    LIMIT $6
+    LIMIT $7
     `,
     lng,
     lat,
     radiusMeters,
     category ?? null,
     excludeProfileId ?? null,
+    excludeProfileIds,
     limit
   );
 

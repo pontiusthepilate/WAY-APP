@@ -323,3 +323,36 @@ model DirectMessage {
 
   @@index([conversationId, createdAt])
 }
+
+// A directed suppression edge — same shape as Follow, opposite intent.
+// "block" is mutual: it also blocks new conversations/WayRequests between
+// the two and hides each from the other's search results. "mute" is
+// one-directional and silent: it only hides targetProfileId's posts from
+// actorProfileId's own feed; the muted profile is never told and is
+// unaffected everywhere else.
+model Block {
+  id              String   @id @default(cuid())
+  actorProfileId  String
+  targetProfileId String
+  type            String // "block" | "mute"
+  createdAt       DateTime @default(now())
+
+  @@unique([actorProfileId, targetProfileId, type])
+  @@index([targetProfileId])
+}
+
+// A flag on a profile, post, or comment for moderation review. Mirrors
+// WayRequest's status-string convention; nothing currently automates
+// processing these beyond recording them.
+model Report {
+  id               String   @id @default(cuid())
+  reporterProfileId String
+  targetType       String // "profile" | "post" | "comment"
+  targetId         String
+  reason           String
+  status           String   @default("pending") // "pending" | "reviewed" | "dismissed"
+  createdAt        DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([status])
+}

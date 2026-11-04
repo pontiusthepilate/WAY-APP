@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
+import { getSuppressedProfileIds } from "../lib/blocking";
 
 const createPostBody = z.object({
   profileId: z.string(),
@@ -53,10 +54,12 @@ export async function postRoutes(app: FastifyInstance) {
   // Global reverse-chronological feed (no follow-graph yet — see README).
   app.get("/posts/feed", { onRequest: [app.authenticate] }, async (req) => {
     const q = feedQuery.parse(req.query);
+    const suppressed = q.viewerProfileId ? await getSuppressedProfileIds(q.viewerProfileId) : [];
 
     const posts = await prisma.post.findMany({
       take: q.limit,
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      where: suppressed.length ? { profileId: { notIn: suppressed } } : undefined,
       orderBy: { createdAt: "desc" },
       include: { profile: { select: PROFILE_SUMMARY_SELECT } },
     });

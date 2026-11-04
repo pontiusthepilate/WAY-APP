@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { notifyProfiles } from "../lib/expoPush";
+import { isBlockedEitherWay } from "../lib/blocking";
 
 const createRequestBody = z.object({
   fromProfileId: z.string(),
@@ -34,6 +35,9 @@ export async function wayRequestRoutes(app: FastifyInstance) {
     }
     if (toProfile.id === fromProfile.id) {
       return reply.status(400).send({ error: "You can't send a WAY request to yourself" });
+    }
+    if (await isBlockedEitherWay(fromProfile.id, toProfile.id)) {
+      return reply.status(403).send({ error: "You can't send a WAY request to this profile" });
     }
 
     const created = await prisma.wayRequest.create({

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
+import { isBlockedEitherWay } from "../lib/blocking";
 
 const startConversationBody = z.object({ profileId: z.string(), withProfileId: z.string() });
 const listQuery = z.object({ profileId: z.string() });
@@ -48,6 +49,9 @@ export async function messageRoutes(app: FastifyInstance) {
     await assertOwnsProfile(userId, body.profileId);
     if (body.profileId === body.withProfileId) {
       return reply.status(400).send({ error: "Can't start a conversation with yourself" });
+    }
+    if (await isBlockedEitherWay(body.profileId, body.withProfileId)) {
+      return reply.status(403).send({ error: "You can't message this profile" });
     }
 
     const [profileAId, profileBId] = canonicalPair(body.profileId, body.withProfileId);

@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { findNearbyProfiles } from "../lib/geo";
 import { geocodeAddress, GeocodeConfigError } from "../lib/geocode";
 import { normalizeWayId } from "../lib/wayId";
+import { getSuppressedProfileIds } from "../lib/blocking";
 
 // Config/outage errors are logged with the real reason but never shown to
 // the end user verbatim; a bad address gets its own (already friendly) message.
@@ -81,6 +82,7 @@ export async function searchRoutes(app: FastifyInstance) {
       radiusMeters: q.radiusMeters,
       category: q.category,
       excludeProfileId: q.profileId,
+      excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToNearby",
     });
   });
@@ -101,6 +103,7 @@ export async function searchRoutes(app: FastifyInstance) {
       radiusMeters: q.radiusMeters,
       category: q.category,
       excludeProfileId: q.profileId,
+      excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToAddress",
     });
   });
@@ -129,6 +132,7 @@ export async function searchRoutes(app: FastifyInstance) {
       radiusMeters: q.radiusMeters,
       category: q.category,
       excludeProfileId: q.profileId,
+      excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToLocation",
     });
   });
@@ -145,20 +149,21 @@ export async function searchRoutes(app: FastifyInstance) {
     const q = wayIdQuery.parse(req.query);
     const raw = q.query.trim().replace(/^way\//i, "").trim();
     if (!raw) return [];
+    const suppressed = await getSuppressedProfileIds(q.profileId, { includeMuted: false });
 
     if (PHONE_LIKE.test(raw)) {
       const phone = raw.replace(/[\s\-().]/g, "");
       const user = await prisma.user.findUnique({ where: { phone } });
       if (!user) return [];
       const profiles = await prisma.profile.findMany({
-        where: { userId: user.id, isVisible: true, id: { not: q.profileId } },
+        where: { userId: user.id, isVisible: true, id: { not: q.profileId, notIn: suppressed } },
         select: LOOKUP_SELECT,
       });
       return profiles;
     }
 
     const profile = await prisma.profile.findFirst({
-      where: { wayId: normalizeWayId(raw), isVisible: true, id: { not: q.profileId } },
+      where: { wayId: normalizeWayId(raw), isVisible: true, id: { not: q.profileId, notIn: suppressed } },
       select: LOOKUP_SELECT,
     });
     return profile ? [profile] : [];
