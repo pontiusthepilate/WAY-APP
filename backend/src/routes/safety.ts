@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
+import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 
 const blockType = z.enum(["block", "mute"]);
 
@@ -57,7 +58,15 @@ export async function safetyRoutes(app: FastifyInstance) {
     const { userId } = requireUser(req);
     const q = listBlocksQuery.parse(req.query);
     await assertOwnsProfile(userId, q.profileId);
-    return prisma.block.findMany({ where: { actorProfileId: q.profileId, type: q.type } });
+    const blocks = await prisma.block.findMany({ where: { actorProfileId: q.profileId, type: q.type } });
+
+    const targetIds = blocks.map((b) => b.targetProfileId);
+    const targets = targetIds.length
+      ? await prisma.profile.findMany({ where: { id: { in: targetIds } }, select: PROFILE_SUMMARY_SELECT })
+      : [];
+    const targetById = new Map(targets.map((p) => [p.id, p]));
+
+    return blocks.map((b) => ({ ...b, targetProfile: targetById.get(b.targetProfileId) ?? null }));
   });
 
   app.post("/reports", { onRequest: [app.authenticate] }, async (req, reply) => {

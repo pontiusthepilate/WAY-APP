@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,12 +23,8 @@ const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { activeProfile, profiles, setActiveProfileId, signOut, refreshProfiles } = useSession();
-
-  async function handleSignOut() {
-    await signOut();
-    router.replace("/welcome");
-  }
+  const insets = useSafeAreaInsets();
+  const { activeProfile, profiles, setActiveProfileId, refreshProfiles } = useSession();
   const [posts, setPosts] = useState<Post[]>([]);
   const [scheduled, setScheduled] = useState<LiveSession[]>([]);
   const [cameraRequests, setCameraRequests] = useState<RemoteCameraRequest[]>([]);
@@ -106,6 +103,13 @@ export default function ProfileScreen() {
   return (
     <View style={styles.root}>
       <SkyOceanBackground tone="pale" />
+      <Pressable
+        style={[styles.settingsButton, { top: spacing.md + insets.top }]}
+        onPress={() => router.push("/settings")}
+        hitSlop={8}
+      >
+        <Ionicons name="settings-outline" size={22} color={colors.textPrimary} />
+      </Pressable>
       <FlatList
       style={styles.container}
       contentContainerStyle={styles.listPadding}
@@ -244,9 +248,6 @@ export default function ProfileScreen() {
             <Pressable style={[styles.actionButton, styles.goLiveButton]} onPress={() => router.push("/go-live")}>
               <Text style={styles.actionButtonText}>Go Live</Text>
             </Pressable>
-            <Pressable style={[styles.actionButton, styles.signOutButton]} onPress={handleSignOut}>
-              <Text style={styles.signOutText}>Sign out</Text>
-            </Pressable>
           </View>
         </View>
       }
@@ -347,7 +348,16 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 999, paddingVertical: spacing.sm, alignItems: "center" },
   actionButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
   goLiveButton: { backgroundColor: colors.danger },
-  signOutButton: { backgroundColor: colors.surfaceAlt },
-  signOutText: { color: colors.danger, fontWeight: "700" },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
+  settingsButton: {
+    position: "absolute",
+    right: spacing.lg,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
