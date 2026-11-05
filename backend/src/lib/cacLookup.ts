@@ -6,7 +6,8 @@
 // Not official or endorsed by CAC — this is one Actor's best-effort scrape
 // of the public register, so treat a lookup failure as "couldn't confirm",
 // not "not registered".
-const APIFY_ACTOR = "regdata/nigeria-cac-company-scraper";
+// Apify's REST URLs join the owner and Actor name with "~", not "/".
+const APIFY_ACTOR = "regdata~nigeria-cac-company-scraper";
 const APIFY_BASE_URL = "https://api.apify.com/v2";
 // $9 / 1,000 searches at the time this was wired up — a single lookup here
 // costs a fraction of a cent, so this cap is just a sanity ceiling against a
