@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Dimensions, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, BackHandler, Dimensions, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { NearbyResult } from "../types";
 import { formatDistance } from "../lib/formatDistance";
 import { FollowButton } from "./FollowButton";
+import { useSession } from "../context/SessionContext";
+import { createBlock, createReport } from "../api/safety";
 
 interface Props {
   result: NearbyResult | null;
@@ -12,6 +14,8 @@ interface Props {
   onRequestCamera: (result: NearbyResult) => void;
   onMessage: (result: NearbyResult) => void;
 }
+
+const REPORT_REASONS = ["Spam", "Harassment", "Inappropriate content", "Other"];
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const ANIM_MS = 260;
@@ -36,9 +40,12 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
   const [mountedResult, setMountedResult] = useState(result);
   if (result && result !== mountedResult) setMountedResult(result);
 
+  const { activeProfile } = useSession();
   const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const pendingActionRef = useRef<(() => void) | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
 
   useEffect(() => {
     if (result) {
@@ -52,6 +59,8 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
         Animated.timing(backdropOpacity, { toValue: 0, duration: ANIM_MS, useNativeDriver: true }),
       ]).start(() => {
         setMountedResult(null);
+        setMenuOpen(false);
+        setReportMenuOpen(false);
         const action = pendingActionRef.current;
         pendingActionRef.current = null;
         action?.();
@@ -77,6 +86,43 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
   if (!mountedResult) return null;
   const shown = mountedResult;
 
+  async function handleBlock() {
+    if (!activeProfile) return;
+    setMenuOpen(false);
+    try {
+      await createBlock(activeProfile.id, shown.id, "block");
+      onClose();
+      Alert.alert("Blocked", `You won't see ${shown.displayName} anymore, and they can't message or request you.`);
+    } catch {
+      Alert.alert("Couldn't block", "Something went wrong. Try again.");
+    }
+  }
+
+  async function handleMute() {
+    if (!activeProfile) return;
+    setMenuOpen(false);
+    try {
+      await createBlock(activeProfile.id, shown.id, "mute");
+      onClose();
+      Alert.alert("Muted", `You won't see ${shown.displayName}'s posts in your feed.`);
+    } catch {
+      Alert.alert("Couldn't mute", "Something went wrong. Try again.");
+    }
+  }
+
+  async function handleReport(reason: string) {
+    if (!activeProfile) return;
+    setReportMenuOpen(false);
+    setMenuOpen(false);
+    try {
+      await createReport(activeProfile.id, "profile", shown.id, reason);
+      onClose();
+      Alert.alert("Reported", "Thanks — we'll review this.");
+    } catch {
+      Alert.alert("Couldn't report", "Something went wrong. Try again.");
+    }
+  }
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]}>
@@ -85,6 +131,41 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
 
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
         <View style={styles.handle} />
+
+        <Pressable
+          style={styles.kebabButton}
+          onPress={() => {
+            setReportMenuOpen(false);
+            setMenuOpen((open) => !open);
+          }}
+          hitSlop={8}
+        >
+          <Text style={styles.kebabText}>⋯</Text>
+        </Pressable>
+
+        {menuOpen && !reportMenuOpen && (
+          <View style={styles.dropdown}>
+            <Pressable style={styles.dropdownItem} onPress={handleMute}>
+              <Text style={styles.dropdownItemText}>Mute</Text>
+            </Pressable>
+            <Pressable style={styles.dropdownItem} onPress={handleBlock}>
+              <Text style={[styles.dropdownItemText, styles.dropdownItemDanger]}>Block</Text>
+            </Pressable>
+            <Pressable style={styles.dropdownItem} onPress={() => setReportMenuOpen(true)}>
+              <Text style={[styles.dropdownItemText, styles.dropdownItemDanger]}>Report</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {reportMenuOpen && (
+          <View style={styles.dropdown}>
+            {REPORT_REASONS.map((reason) => (
+              <Pressable key={reason} style={styles.dropdownItem} onPress={() => handleReport(reason)}>
+                <Text style={styles.dropdownItemText}>{reason}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <View style={styles.avatarRing}>
           {shown.displayPictureUrl ? (
@@ -157,6 +238,32 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: "center",
   },
+  kebabButton: {
+    position: "absolute",
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kebabText: { fontSize: 22, color: colors.textSecondary, fontWeight: "700" },
+  dropdown: {
+    position: "absolute",
+    top: spacing.sm + 32,
+    right: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.xs,
+    minWidth: 160,
+    zIndex: 10,
+    elevation: 10,
+  },
+  dropdownItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  dropdownItemText: { ...typography.body, color: colors.textPrimary },
+  dropdownItemDanger: { color: colors.danger },
   handle: {
     width: 40,
     height: 4,
