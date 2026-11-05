@@ -48,18 +48,15 @@ export default function ScanScreen() {
   }
 
   function openRequest(result: NearbyResult) {
-    setFound(null);
     router.replace({ pathname: "/way-request", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
   }
 
   function openCameraRequest(result: NearbyResult) {
-    setFound(null);
     router.replace({ pathname: "/request-camera", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
   }
 
   async function openMessage(result: NearbyResult) {
     if (!activeProfile) return;
-    setFound(null);
     const conversation = await startConversation(activeProfile.id, result.id);
     router.replace(`/messages/${conversation.id}`);
   }

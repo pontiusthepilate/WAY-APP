@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { RadarView } from "../../components/RadarView";
@@ -63,6 +63,17 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<NearbyResult | null>(null);
+
+  // MiniProfileModal is a plain in-tree overlay, not a native Modal, so it no
+  // longer covers the floating tab bar on its own (that's a sibling of this
+  // screen inside the tab navigator, painted after it) — hide the tab bar
+  // for as long as the sheet is up so it can't show or capture taps through it.
+  const navigation = useNavigation();
+  useEffect(() => {
+    const parent = navigation.getParent();
+    parent?.setOptions({ tabBarStyle: selected ? { display: "none" } : undefined });
+    return () => parent?.setOptions({ tabBarStyle: undefined });
+  }, [selected, navigation]);
 
   useEffect(() => {
     if (mode === "nearby") refreshDeviceLocation();
@@ -152,18 +163,15 @@ export default function SearchScreen() {
   }
 
   function openRequest(result: NearbyResult) {
-    setSelected(null);
     router.push({ pathname: "/way-request", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
   }
 
   function openCameraRequest(result: NearbyResult) {
-    setSelected(null);
     router.push({ pathname: "/request-camera", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
   }
 
   async function openMessage(result: NearbyResult) {
     if (!activeProfile) return;
-    setSelected(null);
     const conversation = await startConversation(activeProfile.id, result.id);
     router.push(`/messages/${conversation.id}`);
   }
