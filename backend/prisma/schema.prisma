@@ -15,7 +15,31 @@ model User {
   email     String?  @unique
   createdAt DateTime @default(now())
 
-  profiles Profile[]
+  profiles      Profile[]
+  subscriptions Subscription[]
+}
+
+// Recurring paid entitlements (see routes/subscriptions.ts) — currently only
+// "podcast" (a podcast-kind profile is never free; see routes/profiles.ts's
+// kind==="podcast" gate). One active row unlocks exactly one profile slot of
+// that kind, same way the 2 free slots work for personal/business.
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  kind   String // "podcast" — free-form, same spirit as Profile.kind
+
+  status                   String    @default("pending") // "pending" | "active" | "cancelled" | "expired"
+  reference                String    @unique // our own, same pattern as PaystackPayment.reference
+  paystackCustomerCode     String?
+  paystackSubscriptionCode String?
+  planCode                 String
+  currentPeriodEnd         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, kind, status])
 }
 
 // Short-lived verification code sent to a phone or email during sign up / sign in.

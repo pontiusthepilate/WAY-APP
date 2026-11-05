@@ -1,18 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { createProfile, getProfileByWay } from "../api/profiles";
+import {
+  getPodcastPlan,
+  getPodcastStatus,
+  initializePodcastSubscription,
+  verifyPodcastSubscription,
+  type PodcastPlan,
+  type PodcastStatus,
+} from "../api/subscriptions";
+import { formatCurrency } from "../lib/formatCurrency";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
 import { DotOutline } from "../components/DotOutline";
 
-const KINDS: { key: "personal" | "business"; label: string }[] = [
-  { key: "personal", label: "Personal" },
-  { key: "business", label: "Business" },
+type Kind = "personal" | "business" | "podcast";
+
+const KINDS: { key: Kind; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "personal", label: "Personal", icon: "person-outline" },
+  { key: "business", label: "Business", icon: "shield-checkmark-outline" },
+  { key: "podcast", label: "Podcast", icon: "mic-outline" },
 ];
+
+const PODCAST_CALLBACK_URL = "way://podcast-subscribe-callback";
 
 // Mirrors backend/src/lib/wayId.ts's WAY_ID_PATTERN — the mobile app has no
 // package shared with the backend, so this is kept in sync by hand.
@@ -35,11 +50,54 @@ export default function CreateProfileScreen() {
   const router = useRouter();
   const [wayId, setWayId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [kind, setKind] = useState<"personal" | "business">("personal");
+  const [kind, setKind] = useState<Kind>("personal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wayIdStatus, setWayIdStatus] = useState<WayIdStatus>("idle");
+  const [podcastPlan, setPodcastPlan] = useState<PodcastPlan | null>(null);
+  const [podcastStatus, setPodcastStatus] = useState<PodcastStatus | null>(null);
+  const [subscribing, setSubscribing] = useState(false);
   const { refreshProfiles, profiles } = useSession();
+
+  const freeSlotsLeft = 2 - profiles.filter((p) => p.kind !== "podcast").length;
+  const needsPodcastSubscription =
+    kind === "podcast" && !!podcastStatus && podcastStatus.usedSlots >= podcastStatus.activeSlots;
+
+  // Podcast is never free — fetch the live price/entitlement the moment it's
+  // picked, so the paywall (or the all-clear) shows immediately rather than
+  // waiting to find out via a failed /profiles call.
+  useEffect(() => {
+    if (kind !== "podcast" || podcastPlan) return;
+    getPodcastPlan()
+      .then(setPodcastPlan)
+      .catch(() => {});
+    getPodcastStatus()
+      .then(setPodcastStatus)
+      .catch(() => {});
+  }, [kind, podcastPlan]);
+
+  async function handleSubscribe() {
+    setError(null);
+    setSubscribing(true);
+    try {
+      const { authorizationUrl, reference } = await initializePodcastSubscription();
+      const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, PODCAST_CALLBACK_URL);
+      if (result.type !== "success") {
+        setError("Subscription was cancelled.");
+        return;
+      }
+      const verified = await verifyPodcastSubscription(reference);
+      if (verified.status !== "active") {
+        setError(verified.error || "Subscription was not successful.");
+        return;
+      }
+      setPodcastStatus(await getPodcastStatus());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not start the subscription.");
+    } finally {
+      setSubscribing(false);
+    }
+  }
 
   // Debounced live availability check — only hits the network once the
   // format is already valid, and ignores a stale response if the field
@@ -72,6 +130,7 @@ export default function CreateProfileScreen() {
   }, [wayId]);
 
   async function handleCreate() {
+    if (needsPodcastSubscription) return;
     setError(null);
     setLoading(true);
     try {
@@ -92,7 +151,7 @@ export default function CreateProfileScreen() {
       <Text style={styles.title}>Choose your WAY</Text>
       <Text style={styles.subtitle}>
         This is what people will ask you for socially — &ldquo;what&apos;s your WAY?&rdquo; — instead of a username.
-        {"\n"}You have {2 - profiles.length} free profile{2 - profiles.length === 1 ? "" : "s"} left.
+        {"\n"}You have {freeSlotsLeft} free profile{freeSlotsLeft === 1 ? "" : "s"} left.
       </Text>
 
       <Text style={styles.label}>Your WAY</Text>
@@ -143,17 +202,49 @@ export default function CreateProfileScreen() {
             style={[styles.kindPill, kind === k.key && styles.kindPillActive]}
             onPress={() => setKind(k.key)}
           >
+            <Ionicons
+              name={k.icon}
+              size={14}
+              color={kind === k.key ? colors.textOnPrimary : colors.textSecondary}
+              style={styles.kindIcon}
+            />
             <Text style={[styles.kindLabel, kind === k.key && styles.kindLabelActive]}>{k.label}</Text>
           </Pressable>
         ))}
       </View>
 
+      {needsPodcastSubscription && (
+        <View style={styles.paywall}>
+          <Ionicons name="mic" size={20} color={colors.primary} />
+          <Text style={styles.paywallTitle}>Podcast profiles aren&apos;t free</Text>
+          <Text style={styles.paywallBody}>
+            {podcastPlan
+              ? `${formatCurrency(podcastPlan.amount, podcastPlan.currency as any)} / ${podcastPlan.interval} unlocks one podcast profile.`
+              : "Checking the current price…"}
+          </Text>
+          <Pressable
+            style={[styles.subscribeButton, subscribing && styles.buttonDisabled]}
+            disabled={subscribing || !podcastPlan}
+            onPress={handleSubscribe}
+          >
+            {subscribing ? (
+              <ActivityIndicator color={colors.textOnPrimary} />
+            ) : (
+              <Text style={styles.subscribeButtonText}>Subscribe</Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
       {error && <Text style={styles.error}>{error}</Text>}
 
       <DotOutline radius={radii.pill} tone="onDark" style={styles.buttonSpacing}>
         <Pressable
-          style={[styles.button, (wayIdStatus !== "available" || !displayName || loading) && styles.buttonDisabled]}
-          disabled={wayIdStatus !== "available" || !displayName || loading}
+          style={[
+            styles.button,
+            (wayIdStatus !== "available" || !displayName || loading || needsPodcastSubscription) && styles.buttonDisabled,
+          ]}
+          disabled={wayIdStatus !== "available" || !displayName || loading || needsPodcastSubscription}
           onPress={handleCreate}
         >
           {loading ? (
@@ -211,15 +302,38 @@ const styles = StyleSheet.create({
   kindRow: { flexDirection: "row", gap: spacing.sm },
   kindPill: {
     flex: 1,
+    flexDirection: "row",
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
+    justifyContent: "center",
   },
   kindPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  kindIcon: { marginRight: 4 },
   kindLabel: { color: colors.textSecondary, fontWeight: "600" },
   kindLabelActive: { color: colors.textOnPrimary },
+  paywall: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    alignItems: "center",
+    gap: 4,
+  },
+  paywallTitle: { ...typography.body, color: colors.textPrimary, fontWeight: "700" },
+  paywallBody: { ...typography.caption, color: colors.textSecondary, textAlign: "center" },
+  subscribeButton: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
+  subscribeButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
   error: { color: colors.danger, marginTop: spacing.md, ...typography.caption, textAlign: "center" },
   buttonSpacing: { marginTop: spacing.xl },
   button: {

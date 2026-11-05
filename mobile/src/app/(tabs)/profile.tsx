@@ -21,6 +21,13 @@ import type { LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../t
 const COLUMNS = 3;
 const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
 
+// Mirrors create-profile.tsx's KINDS icons, so a profile reads the same way
+// wherever its kind shows up.
+const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  business: "shield-checkmark-outline",
+  podcast: "mic-outline",
+};
+
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -172,6 +179,14 @@ export default function ProfileScreen() {
                   style={[styles.switcherChip, p.id === activeProfile.id && styles.switcherChipActive]}
                   onPress={() => setActiveProfileId(p.id)}
                 >
+                  {KIND_ICON[p.kind] && (
+                    <Ionicons
+                      name={KIND_ICON[p.kind]}
+                      size={12}
+                      color={p.id === activeProfile.id ? colors.textOnPrimary : colors.textSecondary}
+                      style={styles.switcherIcon}
+                    />
+                  )}
                   <Text style={[styles.switcherLabel, p.id === activeProfile.id && styles.switcherLabelActive]}>
                     WAY/{p.wayId}
                   </Text>
@@ -324,8 +339,17 @@ const styles = StyleSheet.create({
   statValue: { ...typography.h3, color: colors.textPrimary },
   statLabel: { ...typography.caption, color: colors.textSecondary },
   switcherRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.xs, marginTop: spacing.lg, paddingHorizontal: spacing.lg },
-  switcherChip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
+  switcherChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   switcherChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  switcherIcon: { marginRight: 4 },
   switcherLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "600" },
   switcherLabelActive: { color: colors.textOnPrimary },
   upcomingSection: { marginTop: spacing.lg, paddingHorizontal: spacing.lg },

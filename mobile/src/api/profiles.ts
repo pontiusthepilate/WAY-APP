@@ -9,7 +9,7 @@ export function createProfile(input: {
   wayId: string;
   displayName: string;
   categories?: string[];
-  kind?: "personal" | "business";
+  kind?: "personal" | "business" | "podcast";
   bio?: string;
 }) {
   return api.post<Profile>("/profiles", input);

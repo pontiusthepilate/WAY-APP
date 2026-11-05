@@ -13,7 +13,7 @@ const createProfileBody = z.object({
   displayPictureUrl: z.string().url().optional(),
   bio: z.string().max(280).optional(),
   categories: z.array(z.string().min(1).max(30)).max(10).default([]),
-  kind: z.enum(["personal", "business"]).default("personal"),
+  kind: z.enum(["personal", "business", "podcast"]).default("personal"),
 });
 
 const updateProfileBody = z.object({
@@ -60,9 +60,24 @@ export async function profileRoutes(app: FastifyInstance) {
       });
     }
 
-    const existingCount = await prisma.profile.count({ where: { userId } });
-    if (existingCount >= FREE_PROFILE_LIMIT) {
-      return reply.status(402).send({ error: `Free plan includes ${FREE_PROFILE_LIMIT} profiles. Upgrade to add more.` });
+    if (body.kind === "podcast") {
+      // Podcast profiles never draw from the 2 free personal/business
+      // slots below — each one is paid for by its own active subscription
+      // instead (see routes/subscriptions.ts).
+      const [activeSlots, usedSlots] = await Promise.all([
+        prisma.subscription.count({ where: { userId, kind: "podcast", status: "active" } }),
+        prisma.profile.count({ where: { userId, kind: "podcast" } }),
+      ]);
+      if (usedSlots >= activeSlots) {
+        return reply.status(402).send({
+          error: "Podcast profiles require an active subscription. Subscribe to add one.",
+        });
+      }
+    } else {
+      const existingCount = await prisma.profile.count({ where: { userId, kind: { not: "podcast" } } });
+      if (existingCount >= FREE_PROFILE_LIMIT) {
+        return reply.status(402).send({ error: `Free plan includes ${FREE_PROFILE_LIMIT} profiles. Upgrade to add more.` });
+      }
     }
 
     const taken = await prisma.profile.findUnique({ where: { wayId } });

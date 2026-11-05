@@ -6,7 +6,7 @@ export interface Profile {
   displayPictureUrl: string | null;
   bio: string | null;
   categories: string[];
-  kind: "personal" | "business";
+  kind: "personal" | "business" | "podcast";
   isVerified: boolean;
   followersCount: number;
   followingCount: number;
