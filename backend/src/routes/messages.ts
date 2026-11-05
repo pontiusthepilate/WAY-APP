@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { isBlockedEitherWay } from "../lib/blocking";
+import { assertParticipant } from "../lib/conversations";
 
 const startConversationBody = z.object({ profileId: z.string(), withProfileId: z.string() });
 const listQuery = z.object({ profileId: z.string() });
@@ -26,20 +27,6 @@ const sendMessageBody = z
 // swapped ids.
 function canonicalPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
-}
-
-// Every route below first checks the given profileId is one of the
-// conversation's two participants — there's no existing analog for this in
-// the codebase (live chat has no concept of a private audience), so this is
-// the one check specific to this feature rather than a shared helper.
-async function assertParticipant(conversationId: string, profileId: string) {
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation || (conversation.profileAId !== profileId && conversation.profileBId !== profileId)) {
-    const err = new Error("Conversation not found");
-    (err as any).statusCode = 404;
-    throw err;
-  }
-  return conversation;
 }
 
 export async function messageRoutes(app: FastifyInstance) {

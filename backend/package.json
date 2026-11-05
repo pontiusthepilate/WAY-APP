@@ -25,12 +25,15 @@
     "africastalking": "^0.8.4",
     "dotenv": "^18.0.4",
     "fastify": "^5.12.5",
+    "jsonwebtoken": "^9.0.3",
+    "livekit-server-sdk": "^2.19.2",
     "nanoid": "^5.1.16",
     "prisma": "^5.22.0",
     "resend": "^6.37.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.3",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"

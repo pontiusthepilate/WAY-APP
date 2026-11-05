@@ -3,7 +3,11 @@ import { z } from "zod";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 
-const registerBody = z.object({ profileId: z.string(), token: z.string().min(1) });
+const registerBody = z.object({
+  profileId: z.string(),
+  token: z.string().min(1),
+  type: z.enum(["expo", "voip"]).default("expo"),
+});
 
 export async function pushRoutes(app: FastifyInstance) {
   app.post("/push/register", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -12,8 +16,8 @@ export async function pushRoutes(app: FastifyInstance) {
     await assertOwnsProfile(userId, body.profileId);
 
     await prisma.pushToken.upsert({
-      where: { profileId_token: { profileId: body.profileId, token: body.token } },
-      create: { profileId: body.profileId, token: body.token },
+      where: { profileId_token_type: { profileId: body.profileId, token: body.token, type: body.type } },
+      create: { profileId: body.profileId, token: body.token, type: body.type },
       update: {},
     });
     reply.status(201).send({ registered: true });
@@ -25,7 +29,7 @@ export async function pushRoutes(app: FastifyInstance) {
     await assertOwnsProfile(userId, body.profileId);
 
     await prisma.pushToken
-      .delete({ where: { profileId_token: { profileId: body.profileId, token: body.token } } })
+      .delete({ where: { profileId_token_type: { profileId: body.profileId, token: body.token, type: body.type } } })
       .catch(() => {});
     reply.send({ registered: false });
   });

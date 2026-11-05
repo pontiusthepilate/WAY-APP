@@ -11,6 +11,11 @@ export interface PushMessage {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  // "high" matters for Android: it's what makes FCM wake the app promptly
+  // for a time-sensitive alert like an incoming call. iOS ignores this
+  // field — it gets the real urgency signal from the separate VoIP push
+  // path (lib/apnsVoipPush.ts) instead.
+  priority?: "default" | "normal" | "high";
 }
 
 export async function sendPushNotifications(messages: PushMessage[]): Promise<void> {
@@ -46,6 +51,11 @@ export async function notifyProfiles(
   data: Record<string, unknown> = {}
 ): Promise<void> {
   if (profileIds.length === 0) return;
-  const tokens = await prisma.pushToken.findMany({ where: { profileId: { in: profileIds } }, select: { token: true } });
+  // "voip" tokens are APNs device tokens, not Expo push tokens — Expo's
+  // endpoint would reject them. Only "expo" tokens belong here.
+  const tokens = await prisma.pushToken.findMany({
+    where: { profileId: { in: profileIds }, type: "expo" },
+    select: { token: true },
+  });
   await sendPushNotifications(tokens.map((t) => ({ to: t.token, title, body, data })));
 }

@@ -226,17 +226,21 @@ model Follow {
   @@index([followingId])
 }
 
-// One Expo push token per (profile, device). A profile registers its
+// One push token per (profile, device, type). A profile registers its
 // device's token while signed in; "notify followers" fans out to every
 // token belonging to every profile that follows the broadcaster.
+// "type" distinguishes a regular Expo push token from an iOS VoIP
+// (PushKit) token — the two use entirely different delivery paths
+// (lib/expoPush.ts vs lib/apnsVoipPush.ts) and must never be mixed.
 model PushToken {
   id        String   @id @default(cuid())
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [id])
   token     String
+  type      String   @default("expo") // "expo" | "voip"
   createdAt DateTime @default(now())
 
-  @@unique([profileId, token])
+  @@unique([profileId, token, type])
 }
 
 // A go-live broadcast (feature 15). The video transport itself is stubbed —
@@ -397,4 +401,25 @@ model Notification {
 
   @@index([profileId, createdAt])
   @@index([profileId, read])
+}
+
+// A voice/video call hanging off an existing DM Conversation — calls are
+// always between the two people already in that thread. roomName is the
+// LiveKit room id (derived from this row's own id, see routes/calls.ts),
+// not stored separately on Conversation since a conversation can have many
+// calls over time.
+model Call {
+  id              String    @id @default(cuid())
+  conversationId  String
+  callerProfileId String
+  calleeProfileId String
+  type            String // "voice" | "video"
+  status          String    @default("ringing") // "ringing" | "accepted" | "declined" | "missed" | "ended"
+  roomName        String
+  createdAt       DateTime  @default(now())
+  answeredAt      DateTime?
+  endedAt         DateTime?
+
+  @@index([conversationId, createdAt])
+  @@index([calleeProfileId, status])
 }
