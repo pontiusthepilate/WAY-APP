@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,7 +12,9 @@ import { getIncomingCameraRequests } from "../../api/remoteCamera";
 import { getIncomingWayRequests } from "../../api/wayRequests";
 import { updateProfile } from "../../api/profiles";
 import { uploadMedia } from "../../api/uploads";
+import { getActiveStatusIds } from "../../api/status";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { Avatar } from "../../components/Avatar";
 import type { LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../types";
 
 const COLUMNS = 3;
@@ -32,20 +34,23 @@ export default function ProfileScreen() {
   const [wayRequests, setWayRequests] = useState<WayRequest[]>([]);
   const [pictureMenuOpen, setPictureMenuOpen] = useState(false);
   const [pictureSaving, setPictureSaving] = useState(false);
+  const [hasActiveStatus, setHasActiveStatus] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
     try {
-      const [page, upcoming, incomingCamera, incomingWay] = await Promise.all([
+      const [page, upcoming, incomingCamera, incomingWay, activeStatusIds] = await Promise.all([
         getProfilePosts(activeProfile.id, { viewerProfileId: activeProfile.id, limit: 50 }).catch(() => ({ posts: [], nextCursor: null })),
         getScheduledLiveSessions(activeProfile.id).catch(() => []),
         getIncomingCameraRequests(activeProfile.id).catch(() => []),
         getIncomingWayRequests(activeProfile.id).catch(() => []),
+        getActiveStatusIds([activeProfile.id]).catch((): string[] => []),
       ]);
       setPosts(page.posts);
       setScheduled(upcoming);
       setCameraRequests(incomingCamera.filter((r) => r.status === "pending"));
       setWayRequests(incomingWay.filter((r) => r.status === "pending"));
+      setHasActiveStatus(activeStatusIds.includes(activeProfile.id));
     } catch {
       setPosts([]);
     }
@@ -111,13 +116,20 @@ export default function ProfileScreen() {
         <View>
           <View style={styles.header}>
             <View style={styles.avatarWrap}>
-              {activeProfile.displayPictureUrl ? (
-                <Image source={{ uri: activeProfile.displayPictureUrl }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarInitial}>{activeProfile.displayName.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
+              <Avatar
+                uri={activeProfile.displayPictureUrl}
+                displayName={activeProfile.displayName}
+                size={88}
+                hasActiveStatus={hasActiveStatus}
+                onPress={() =>
+                  hasActiveStatus
+                    ? router.push({
+                        pathname: "/status/[profileId]",
+                        params: { profileId: activeProfile.id, displayName: activeProfile.displayName },
+                      })
+                    : router.push("/status-composer")
+                }
+              />
               <Pressable
                 style={styles.avatarMenuBadge}
                 onPress={() => setPictureMenuOpen(true)}
@@ -279,9 +291,6 @@ const styles = StyleSheet.create({
   listPadding: { paddingBottom: 90 },
   header: { alignItems: "center", paddingTop: spacing.xl, paddingHorizontal: spacing.lg },
   avatarWrap: { width: 88, height: 88 },
-  avatar: { width: 88, height: 88, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: colors.primaryDark, fontWeight: "700", fontSize: 32 },
   avatarMenuBadge: {
     position: "absolute",
     bottom: 2,

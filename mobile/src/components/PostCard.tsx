@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { Post, ReactionType } from "../types";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { getReactionBreakdown, registerShare, registerView, toggleLike } from "../api/posts";
+import { Avatar } from "./Avatar";
 
 const REACTION_EMOJI: Record<ReactionType, string> = {
   like: "❤️",
@@ -20,9 +22,11 @@ interface Props {
   post: Post;
   onChange: (post: Post) => void;
   onOpenComments: (post: Post) => void;
+  hasActiveStatus?: boolean;
 }
 
-export function PostCard({ post, onChange, onOpenComments }: Props) {
+export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Props) {
+  const router = useRouter();
   const viewedRef = useRef(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -73,13 +77,21 @@ export function PostCard({ post, onChange, onOpenComments }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        {post.profile.displayPictureUrl ? (
-          <Image source={{ uri: post.profile.displayPictureUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarInitial}>{post.profile.displayName.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
+        <Avatar
+          uri={post.profile.displayPictureUrl}
+          displayName={post.profile.displayName}
+          size={40}
+          hasActiveStatus={hasActiveStatus}
+          onPress={
+            hasActiveStatus
+              ? () =>
+                  router.push({
+                    pathname: "/status/[profileId]",
+                    params: { profileId: post.profile.id, displayName: post.profile.displayName },
+                  })
+              : undefined
+          }
+        />
         <View style={styles.headerText}>
           <Text style={styles.name} numberOfLines={1}>
             {post.profile.displayName}
@@ -157,9 +169,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.divider,
   },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, marginBottom: spacing.sm },
-  avatar: { width: 40, height: 40, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: colors.primaryDark, fontWeight: "700" },
   headerText: { marginLeft: spacing.sm, flex: 1 },
   name: { ...typography.h3, color: colors.textPrimary },
   way: { ...typography.caption, color: colors.textSecondary, marginTop: 1 },

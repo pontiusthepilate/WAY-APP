@@ -24,6 +24,17 @@ export interface Profile {
   createdAt: string;
 }
 
+export interface Status {
+  id: string;
+  profileId: string;
+  mediaUrl: string | null;
+  mediaType: "image" | "video" | null;
+  caption: string | null;
+  backgroundColor: string | null;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export interface NearbyResult {
   id: string;
   wayId: string;

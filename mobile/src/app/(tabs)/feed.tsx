@@ -13,6 +13,7 @@ import { useAutoScroll } from "../../lib/useAutoScroll";
 import { getDiscoverFeed, getFeed } from "../../api/posts";
 import { getActiveLiveSessions } from "../../api/live";
 import { getUnreadNotificationCount } from "../../api/notifications";
+import { getActiveStatusIds } from "../../api/status";
 import type { AutoScrollSpeed, LiveSession, Post } from "../../types";
 
 // Not as time-sensitive as a chat thread, so a longer interval than
@@ -37,6 +38,17 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [statusAuthorIds, setStatusAuthorIds] = useState<Set<string>>(new Set());
+
+  // Batched per page — one call for every author on the page, not one per
+  // avatar. "replace" on a fresh load (first page/refresh/tab switch) so
+  // stale ids from a previous post set don't linger; "merge" on loadMore so
+  // paginating doesn't drop ring state already known for earlier posts.
+  async function refreshStatusAuthors(pagePosts: Post[], mode: "replace" | "merge") {
+    const ids = [...new Set(pagePosts.map((p) => p.profile.id))];
+    const active = await getActiveStatusIds(ids).catch(() => []);
+    setStatusAuthorIds((prev) => new Set(mode === "merge" ? [...prev, ...active] : active));
+  }
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -58,11 +70,13 @@ export default function FeedScreen() {
         setPosts(page.posts);
         setCursor(page.nextCursor);
         setLiveSessions(active);
+        refreshStatusAuthors(page.posts, "replace");
       } else {
         const page = await getDiscoverFeed({ profileId: activeProfile.id, limit: 20 });
         setPosts(page.posts);
         setCursor(page.nextCursor);
         setLiveSessions([]);
+        refreshStatusAuthors(page.posts, "replace");
       }
     } catch {
       setError("Couldn't load the feed. Pull to retry.");
@@ -93,6 +107,7 @@ export default function FeedScreen() {
           : await getDiscoverFeed({ profileId: activeProfile.id, cursor, limit: 20 });
       setPosts((prev) => [...prev, ...page.posts]);
       setCursor(page.nextCursor);
+      refreshStatusAuthors(page.posts, "merge");
     } catch {
       // keep existing posts; next pull-to-refresh or scroll retry will attempt again
     } finally {
@@ -146,7 +161,12 @@ export default function FeedScreen() {
           <LiveRail sessions={liveSessions} onSelect={(session) => router.push(`/live/${session.id}`)} />
         }
         renderItem={({ item }) => (
-          <PostCard post={item} onChange={updatePost} onOpenComments={(post) => router.push(`/post/${post.id}`)} />
+          <PostCard
+            post={item}
+            onChange={updatePost}
+            onOpenComments={(post) => router.push(`/post/${post.id}`)}
+            hasActiveStatus={statusAuthorIds.has(item.profile.id)}
+          />
         )}
         onScroll={(e) => autoScrollHandlers.onScroll(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={32}
