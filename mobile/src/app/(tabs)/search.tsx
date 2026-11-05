@@ -326,6 +326,7 @@ export default function SearchScreen() {
         onSendRequest={openRequest}
         onRequestCamera={openCameraRequest}
         onMessage={openMessage}
+        onOpenProfile={setSelected}
       />
     </View>
   );

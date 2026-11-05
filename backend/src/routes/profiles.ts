@@ -34,6 +34,10 @@ const visibilityBody = z.object({
   visibilityImageUrl: z.string().url().optional(),
 });
 
+const linksBody = z.object({
+  linkedProfileIds: z.array(z.string()).max(20),
+});
+
 const locationBody = z.object({
   actualLat: z.number().min(-90).max(90),
   actualLng: z.number().min(-180).max(180),
@@ -112,6 +116,45 @@ export async function profileRoutes(app: FastifyInstance) {
     await assertOwnsProfile(userId, id);
     const body = visibilityBody.parse(req.body);
     return prisma.profile.update({ where: { id }, data: body });
+  });
+
+  // Public: lets anyone viewing a profile see which of the owner's other
+  // profiles they've chosen to cross-link from this one (feature:
+  // profile-kind cross-linking). Returns full Profile rows, same shape as
+  // GET /profiles/way/:wayId, so mobile can reuse that type directly.
+  app.get("/profiles/:id/links", async (req) => {
+    const { id } = req.params as { id: string };
+    const links = await prisma.profileLink.findMany({
+      where: { profileId: id },
+      include: { linkedProfile: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return links.map((l) => l.linkedProfile);
+  });
+
+  // Owner-only: replaces the full set of profiles cross-linked from `id`.
+  // Both ends must belong to the same user — this is about a user's own
+  // profiles pointing at each other, not a connection between two users.
+  app.put("/profiles/:id/links", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    await assertOwnsProfile(userId, id);
+    const body = linksBody.parse(req.body);
+
+    const targetIds = [...new Set(body.linkedProfileIds)].filter((linkedId) => linkedId !== id);
+    const owned = await prisma.profile.count({ where: { id: { in: targetIds }, userId } });
+    if (owned !== targetIds.length) {
+      return reply.status(400).send({ error: "Can only link to your own other profiles" });
+    }
+
+    await prisma.$transaction([
+      prisma.profileLink.deleteMany({ where: { profileId: id } }),
+      ...(targetIds.length
+        ? [prisma.profileLink.createMany({ data: targetIds.map((linkedProfileId) => ({ profileId: id, linkedProfileId })) })]
+        : []),
+    ]);
+    const links = await prisma.profileLink.findMany({ where: { profileId: id }, include: { linkedProfile: true } });
+    reply.send(links.map((l) => l.linkedProfile));
   });
 
   // Updates the device's real location and, optionally, a decoupled display

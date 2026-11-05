@@ -1,11 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
-import type { NearbyResult } from "../types";
+import type { NearbyResult, Profile } from "../types";
 import { formatDistance } from "../lib/formatDistance";
 import { FollowButton } from "./FollowButton";
 import { useSession } from "../context/SessionContext";
 import { createBlock, createReport } from "../api/safety";
+import { getProfileLinks } from "../api/profileLinks";
+
+const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  business: "shield-checkmark-outline",
+  podcast: "mic-outline",
+};
 
 interface Props {
   result: NearbyResult | null;
@@ -13,6 +20,11 @@ interface Props {
   onSendRequest: (result: NearbyResult) => void;
   onRequestCamera: (result: NearbyResult) => void;
   onMessage: (result: NearbyResult) => void;
+  // Lets a viewer jump to another of this profile's owner's profiles via the
+  // "Also on WAY" row below — the parent just swaps its own selected/found
+  // state, same as picking any other search result (profile-kind
+  // cross-linking, feature phase 2).
+  onOpenProfile?: (profile: NearbyResult) => void;
 }
 
 const REPORT_REASONS = ["Spam", "Harassment", "Inappropriate content", "Other"];
@@ -31,7 +43,7 @@ const ANIM_MS = 260;
 // own content-dispatch path on this RN version rather than anything in this
 // component's layout. A plain overlay has no native view-controller
 // boundary for either problem to occur across.
-export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCamera, onMessage }: Props) {
+export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCamera, onMessage, onOpenProfile }: Props) {
   // Kept mounted past `result` going null so the sheet can finish sliding
   // down before it disappears, instead of vanishing mid-animation. Set
   // directly during render (React's own pattern for state derived from a
@@ -46,6 +58,14 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
   const pendingActionRef = useRef<(() => void) | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [links, setLinks] = useState<Profile[]>([]);
+
+  useEffect(() => {
+    if (!result) return;
+    getProfileLinks(result.id)
+      .then(setLinks)
+      .catch(() => setLinks([]));
+  }, [result]);
 
   useEffect(() => {
     if (result) {
@@ -202,6 +222,26 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
           </Text>
         )}
 
+        {links.length > 0 && (
+          <View style={styles.linksBox}>
+            <Text style={styles.linksLabel}>Also on WAY</Text>
+            <View style={styles.linksRow}>
+              {links.map((link) => (
+                <Pressable
+                  key={link.id}
+                  style={styles.linkChip}
+                  onPress={() => onOpenProfile?.(link)}
+                >
+                  {KIND_ICON[link.kind] && (
+                    <Ionicons name={KIND_ICON[link.kind]} size={12} color={colors.primaryDark} style={styles.linkChipIcon} />
+                  )}
+                  <Text style={styles.linkChipText}>WAY/{link.wayId}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
         <Pressable style={styles.requestButton} onPress={() => closeThen(() => onSendRequest(shown))}>
           <Text style={styles.requestButtonText}>Send WAY Request</Text>
         </Pressable>
@@ -305,6 +345,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.sm,
   },
+  linksBox: { marginTop: spacing.md, width: "100%" },
+  linksLabel: { ...typography.caption, color: colors.textSecondary, textAlign: "center", marginBottom: spacing.xs },
+  linksRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.xs },
+  linkChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 999,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  linkChipIcon: { marginRight: 4 },
+  linkChipText: { ...typography.caption, color: colors.primaryDark, fontWeight: "600" },
   requestButton: {
     marginTop: spacing.lg,
     backgroundColor: colors.primary,

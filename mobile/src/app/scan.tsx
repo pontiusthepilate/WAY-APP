@@ -109,6 +109,7 @@ export default function ScanScreen() {
         onSendRequest={openRequest}
         onRequestCamera={openCameraRequest}
         onMessage={openMessage}
+        onOpenProfile={setFound}
       />
     </View>
   );

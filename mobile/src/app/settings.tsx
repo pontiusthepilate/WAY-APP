@@ -12,7 +12,7 @@ import { PageBackground } from "../components/PageBackground";
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activeProfile, signOut } = useSession();
+  const { activeProfile, profiles, signOut } = useSession();
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -43,6 +43,9 @@ export default function SettingsScreen() {
       <Text style={styles.sectionLabel}>Account</Text>
       <Row icon="person-outline" label="Edit profile" onPress={() => router.push("/edit-profile")} />
       <Row icon="eye-off-outline" label="Blocked accounts" onPress={() => router.push("/blocked-accounts")} />
+      {profiles.length > 1 && (
+        <Row icon="link-outline" label="Linked profiles" onPress={() => router.push("/profile-links")} />
+      )}
       {activeProfile?.kind === "business" && (
         <Row
           icon="shield-checkmark-outline"

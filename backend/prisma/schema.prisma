@@ -101,7 +101,29 @@ model Profile {
   pushTokens   PushToken[]
   liveSessions LiveSession[]
 
+  linksFrom ProfileLink[] @relation("ProfileLinksFrom")
+  linksTo   ProfileLink[] @relation("ProfileLinksTo")
+
   @@index([userId])
+}
+
+// A cross-link from one of a user's own profiles to another, shown to
+// viewers of `profile` as "also on WAY as {linkedProfile}". Owner-controlled
+// per source profile (feature: profile-kind cross-linking) — a row's mere
+// existence means the link is shown; there's no separate visibility flag.
+// Both profiles must belong to the same user, enforced in routes/profiles.ts
+// rather than at the schema level (Prisma can't express a same-parent
+// constraint across two FKs).
+model ProfileLink {
+  id              String   @id @default(cuid())
+  profileId       String
+  profile         Profile  @relation("ProfileLinksFrom", fields: [profileId], references: [id])
+  linkedProfileId String
+  linkedProfile   Profile  @relation("ProfileLinksTo", fields: [linkedProfileId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@unique([profileId, linkedProfileId])
+  @@index([profileId])
 }
 
 // A connection request sent from one profile to another after finding them
