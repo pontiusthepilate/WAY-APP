@@ -1,4 +1,4 @@
-interface PendingCallSession {
+export interface PendingCallSession {
   token: string | null;
   liveKitConfigured: boolean;
   isCaller: boolean;

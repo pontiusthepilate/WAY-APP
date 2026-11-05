@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import * as Device from "expo-device";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,10 +16,10 @@ import { Track } from "livekit-client";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { LIVEKIT_URL } from "../../api/config";
-import { endCall, getCall } from "../../api/calls";
+import { acceptCall, endCall, getCall } from "../../api/calls";
 import { endCallKeepSession, reportCallConnected } from "../../lib/callKeep";
 import { safeBack } from "../../lib/navigation";
-import { takePendingCallSession } from "../../lib/activeCallSession";
+import { takePendingCallSession, type PendingCallSession } from "../../lib/activeCallSession";
 import type { Call } from "../../types";
 
 const POLL_MS = 3000;
@@ -28,10 +29,35 @@ export default function CallScreen() {
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
 
-  const [session] = useState(() => takePendingCallSession());
+  const [session, setSession] = useState(() => takePendingCallSession());
   const [call, setCall] = useState<Call | null>(null);
   const [ended, setEnded] = useState(false);
   const leftRef = useRef(false);
+  const acceptAttemptedRef = useRef(false);
+
+  // Reached with no pending session when this screen was opened some way
+  // other than the normal in-app call-button/CallKeep-answer flow — a deep
+  // link, or the app relaunching into a call already in progress. If this
+  // profile is the callee of a still-ringing call, accept it here instead of
+  // just showing "not set up" — this is the one transition the backend lets
+  // a participant trigger after the fact.
+  useEffect(() => {
+    if (session || !call || !activeProfile || acceptAttemptedRef.current) return;
+    if (call.calleeProfileId !== activeProfile.id || call.status !== "ringing") return;
+    acceptAttemptedRef.current = true;
+    acceptCall(callId, activeProfile.id)
+      .then(({ token, liveKitConfigured }) => {
+        const resumed: PendingCallSession = {
+          token,
+          liveKitConfigured,
+          isCaller: false,
+          otherDisplayName: "WAY",
+          otherAvatarUrl: null,
+        };
+        setSession(resumed);
+      })
+      .catch(() => {});
+  }, [session, call, activeProfile, callId]);
 
   const leave = useCallback(() => {
     if (leftRef.current || !callId || !activeProfile) return;
@@ -65,6 +91,11 @@ export default function CallScreen() {
 
   const isVideo = call?.type === "video";
   const canConnect = !!session?.token && session.liveKitConfigured && !!LIVEKIT_URL;
+  // The Simulator's virtual audio device crashes LiveKit's native WebRTC
+  // audio engine (AVAudioEngine/AudioToolbox abort) the moment it tries to
+  // actually start capturing — join the room to exercise the real
+  // connection, but never request mic/camera capture there.
+  const canCapture = Device.isDevice;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -72,8 +103,8 @@ export default function CallScreen() {
         <LiveKitRoom
           serverUrl={LIVEKIT_URL}
           token={session!.token!}
-          audio
-          video={isVideo}
+          audio={canCapture}
+          video={canCapture && isVideo}
           connect
           onConnected={() => reportCallConnected(callId)}
           onDisconnected={leave}
@@ -130,10 +161,12 @@ function CallRoomContent({
   const localTrack = tracks.find((t) => t.participant.isLocal);
 
   function toggleMic() {
+    if (!Device.isDevice) return; // see canCapture above — would crash the Simulator's audio engine
     localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled).catch(() => {});
   }
 
   function toggleCamera() {
+    if (!Device.isDevice) return;
     localParticipant.setCameraEnabled(!isCameraEnabled).catch(() => {});
   }
 
