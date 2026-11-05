@@ -14,6 +14,9 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/gif": ".gif",
   "video/mp4": ".mp4",
   "video/quicktime": ".mov",
+  // Business verification documents (CAC certificate) are usually a PDF
+  // scan, not a photo — see routes/businessVerification.ts.
+  "application/pdf": ".pdf",
 };
 
 // Local-disk upload store for dev/self-hosted use. Swap for S3/Cloudinary/R2
@@ -31,10 +34,13 @@ export async function uploadRoutes(app: FastifyInstance) {
     const filename = `${randomUUID()}${ext}`;
     await pipeline(file.file, createWriteStream(path.join(UPLOAD_DIR, filename)));
 
-    const base = process.env.PUBLIC_BASE_URL ?? `${req.protocol}://${req.headers.host}`;
+    // `||`, not `??` — an empty PUBLIC_BASE_URL (present but unset in .env)
+    // must fall back too, or this produces a relative "/uploads/..." path
+    // that fails every URL-shaped validation downstream (documentUrls, etc).
+    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.headers.host}`;
     reply.status(201).send({
       url: `${base}/uploads/${filename}`,
-      mediaType: file.mimetype.startsWith("video/") ? "video" : "image",
+      mediaType: file.mimetype === "application/pdf" ? "document" : file.mimetype.startsWith("video/") ? "video" : "image",
     });
   });
 }

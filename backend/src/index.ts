@@ -2,6 +2,7 @@ import "dotenv/config";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import Fastify from "fastify";
+import { ZodError } from "zod";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
@@ -58,6 +59,25 @@ async function main() {
   });
 
   app.get("/health", async () => ({ ok: true, service: "way-backend" }));
+
+  // Every route validates its input with a zod .parse() that just throws on
+  // failure — without this, that throw fell through to Fastify's default
+  // handler as a raw 500 with the dumped ZodError, on every route in the
+  // app, not just one. Routes that throw their own Error with a
+  // .statusCode attached (e.g. assertOwnsProfile's 404) already worked,
+  // since Fastify's default handler already honors that; this only needed
+  // to special-case ZodError on top of that same behavior.
+  app.setErrorHandler((err, req, reply) => {
+    if (err instanceof ZodError) {
+      return reply.status(400).send({
+        error: err.issues[0]?.message ?? "Invalid request",
+        issues: err.issues,
+      });
+    }
+    const statusCode = (err as { statusCode?: number }).statusCode ?? 500;
+    if (statusCode >= 500) req.log.error(err);
+    reply.status(statusCode).send({ error: (err as Error).message || "Internal Server Error" });
+  });
 
   await app.register(authRoutes);
   await app.register(profileRoutes);

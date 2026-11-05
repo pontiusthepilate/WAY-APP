@@ -439,6 +439,10 @@ model BusinessVerificationRequest {
   companyType     String // "BUSINESS_NAME" | "COMPANY" | "INCORPORATED_TRUSTEES" | "LIMITED_PARTNERSHIP" | "LIMITED_LIABILITY_PARTNERSHIP"
   documentUrls    String[]  @default([])
   status          String    @default("pending") // "pending" | "verified" | "rejected"
+  // True when this profile has a prior *rejected* request — a business
+  // trying again after being turned down once warrants a closer look than
+  // a first-time submission, so admins can filter/tab these separately.
+  isResubmission  Boolean   @default(false)
   lookupSource    String? // "dojah" | "apify" | null when neither was configured at submission time
   lookupResult    Json?
   submittedAt     DateTime  @default(now())

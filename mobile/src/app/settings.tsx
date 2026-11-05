@@ -11,7 +11,7 @@ import { safeBack } from "../lib/navigation";
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signOut } = useSession();
+  const { activeProfile, signOut } = useSession();
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -41,6 +41,13 @@ export default function SettingsScreen() {
       <Text style={styles.sectionLabel}>Account</Text>
       <Row icon="person-outline" label="Edit profile" onPress={() => router.push("/edit-profile")} />
       <Row icon="eye-off-outline" label="Blocked accounts" onPress={() => router.push("/blocked-accounts")} />
+      {activeProfile?.kind === "business" && (
+        <Row
+          icon="shield-checkmark-outline"
+          label="Business verification"
+          onPress={() => router.push("/business-verification")}
+        />
+      )}
 
       <Text style={styles.sectionLabel}>Notifications</Text>
       <View style={styles.infoRow}>

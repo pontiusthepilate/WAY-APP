@@ -20,7 +20,20 @@ const submitBody = z.object({
   documentUrls: z.array(z.string().url()).min(1),
 });
 const mineQuery = z.object({ profileId: z.string() });
-const adminListQuery = z.object({ status: z.enum(["pending", "verified", "rejected"]).optional() });
+// Query strings are always strings — z.coerce.boolean() would treat
+// "false" as truthy (Boolean("false") is true), so this maps the two
+// literal values explicitly instead.
+const queryBoolean = z
+  .enum(["true", "false"])
+  .optional()
+  .transform((v) => (v === undefined ? undefined : v === "true"));
+const adminListQuery = z.object({
+  status: z.enum(["pending", "verified", "rejected"]).optional(),
+  // Lets an admin UI split the list into two tabs: first-time submissions
+  // vs. a business trying again after a rejection, which warrants a
+  // closer look.
+  isResubmission: queryBoolean,
+});
 const decideBody = z
   .object({
     decision: z.enum(["verified", "rejected"]),
@@ -85,6 +98,11 @@ export async function businessVerificationRoutes(app: FastifyInstance) {
       return reply.status(409).send({ error: "A verification request is already pending for this profile" });
     }
 
+    const priorRejectionCount = await prisma.businessVerificationRequest.count({
+      where: { profileId: body.profileId, status: "rejected" },
+    });
+    const isResubmission = priorRejectionCount > 0;
+
     const { source, result } = await fetchCacLookup(body.rcNumber, body.companyType);
 
     const request = await prisma.businessVerificationRequest.create({
@@ -93,10 +111,25 @@ export async function businessVerificationRoutes(app: FastifyInstance) {
         rcNumber: body.rcNumber,
         companyType: body.companyType,
         documentUrls: body.documentUrls,
+        isResubmission,
         lookupSource: source,
         lookupResult: (result as Prisma.InputJsonValue | null) ?? undefined,
       },
     });
+
+    if (isResubmission) {
+      // No admin notification channel exists yet (no admin profile/role to
+      // attach an in-app Notification to) — this is the same "admin
+      // discovers it by checking" pattern as the day-5 escalation below,
+      // just immediate since there's no time delay to wait out. The admin
+      // list's isResubmission filter is what actually gets this the closer
+      // look, not this log line on its own.
+      console.warn(
+        `[WAY][business-verification] RESUBMISSION: profile ${body.profileId} submitted request ${request.id} ` +
+          `after ${priorRejectionCount} prior rejection(s) — review with extra care`
+      );
+    }
+
     reply.status(201).send(withProgress(request));
   });
 
@@ -116,7 +149,10 @@ export async function businessVerificationRoutes(app: FastifyInstance) {
   app.get("/admin/business-verification", { onRequest: [requireAdminSecret] }, async (req, reply) => {
     const q = adminListQuery.parse(req.query);
     const requests = await prisma.businessVerificationRequest.findMany({
-      where: q.status ? { status: q.status } : undefined,
+      where: {
+        ...(q.status ? { status: q.status } : {}),
+        ...(q.isResubmission !== undefined ? { isResubmission: q.isResubmission } : {}),
+      },
       orderBy: [{ status: "asc" }, { submittedAt: "asc" }],
     });
 
