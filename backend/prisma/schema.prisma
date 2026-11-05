@@ -423,3 +423,29 @@ model Call {
   @@index([conversationId, createdAt])
   @@index([calleeProfileId, status])
 }
+
+// A business-kind profile's request to be verified (the checkmark badge —
+// see Profile.isVerified). lookupResult/lookupSource snapshot whatever
+// lib/dojah.ts or lib/cacLookup.ts returned for rcNumber at submission
+// time, so the admin reviewing it sees the registry data as it was then,
+// not a live re-fetch. A human always makes the actual decide call — the
+// lookup only informs it. escalatedAt is set the first time an admin list
+// request notices this one is still pending past the 5-day mark, so that
+// reminder fires exactly once per request rather than on every page load.
+model BusinessVerificationRequest {
+  id              String    @id @default(cuid())
+  profileId       String
+  rcNumber        String
+  companyType     String // "BUSINESS_NAME" | "COMPANY" | "INCORPORATED_TRUSTEES" | "LIMITED_PARTNERSHIP" | "LIMITED_LIABILITY_PARTNERSHIP"
+  documentUrls    String[]  @default([])
+  status          String    @default("pending") // "pending" | "verified" | "rejected"
+  lookupSource    String? // "dojah" | "apify" | null when neither was configured at submission time
+  lookupResult    Json?
+  submittedAt     DateTime  @default(now())
+  decidedAt       DateTime?
+  rejectionReason String?
+  escalatedAt     DateTime?
+
+  @@index([profileId, submittedAt])
+  @@index([status, submittedAt])
+}
