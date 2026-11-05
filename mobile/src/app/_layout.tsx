@@ -5,23 +5,31 @@ import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
+import { registerGlobals } from "@livekit/react-native";
 import { useFonts, Gabarito_600SemiBold, Gabarito_700Bold } from "@expo-google-fonts/gabarito";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { usePushRegistration } from "../lib/usePushRegistration";
+import { useCallKeep } from "../lib/callKeep";
 import { WaterRippleOverlay } from "../components/WaterRippleOverlay";
 import { EdgeGlowBorder } from "../components/EdgeGlowBorder";
 import { colors } from "../theme/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+registerGlobals();
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    // An incoming call gets CallKeep's native ringing UI instead (see
+    // lib/callKeep.ts) — showing the regular banner too would double up.
+    const isIncomingCall = notification.request.content.data?.type === "incoming_call";
+    return {
+      shouldShowAlert: !isIncomingCall,
+      shouldShowBanner: !isIncomingCall,
+      shouldShowList: !isIncomingCall,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 export default function RootLayout() {
@@ -43,6 +51,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const ready = fontsLoaded && !isLoading;
 
   usePushRegistration(activeProfile?.id);
+  useCallKeep(activeProfile?.id);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});

@@ -190,6 +190,19 @@ export interface Conversation {
   createdAt: string;
 }
 
+export interface Call {
+  id: string;
+  conversationId: string;
+  callerProfileId: string;
+  calleeProfileId: string;
+  type: "voice" | "video";
+  status: "ringing" | "accepted" | "declined" | "missed" | "ended";
+  roomName: string;
+  createdAt: string;
+  answeredAt: string | null;
+  endedAt: string | null;
+}
+
 export type NotificationType = "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live";
 
 export interface AppNotification {

@@ -11,7 +11,13 @@ import type { Call } from "@prisma/client";
 // case where the app is already foregrounded.
 export async function notifyIncomingCall(calleeProfileId: string, call: Call, callerDisplayName: string): Promise<void> {
   const tokens = await prisma.pushToken.findMany({ where: { profileId: calleeProfileId } });
-  const data = { type: "incoming_call", callId: call.id, conversationId: call.conversationId, callType: call.type };
+  const data = {
+    type: "incoming_call",
+    callId: call.id,
+    conversationId: call.conversationId,
+    callType: call.type,
+    callerDisplayName,
+  };
 
   const expoTokens = tokens.filter((t) => t.type === "expo");
   await sendPushNotifications(

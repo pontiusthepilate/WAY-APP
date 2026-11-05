@@ -12,15 +12,18 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
-import { getMessages, sendMessage } from "../../api/messages";
+import { getConversations, getMessages, sendMessage } from "../../api/messages";
+import { startCall } from "../../api/calls";
 import { uploadMedia } from "../../api/uploads";
 import { safeBack } from "../../lib/navigation";
-import type { DirectMessage } from "../../types";
+import { setPendingCallSession } from "../../lib/activeCallSession";
+import { startOutgoingCallUI } from "../../lib/callKeep";
+import type { DirectMessage, ProfileSummary } from "../../types";
 
 const POLL_MS = 4000;
 
@@ -28,10 +31,12 @@ export default function ConversationScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [otherProfile, setOtherProfile] = useState<ProfileSummary | null>(null);
 
   const load = useCallback(async () => {
     if (!conversationId || !activeProfile) return;
@@ -51,6 +56,30 @@ export default function ConversationScreen() {
     const poll = setInterval(load, POLL_MS);
     return () => clearInterval(poll);
   }, [load]);
+
+  useEffect(() => {
+    if (!conversationId || !activeProfile) return;
+    getConversations(activeProfile.id)
+      .then((conversations) => {
+        const match = conversations.find((c) => c.id === conversationId);
+        setOtherProfile(match?.otherProfile ?? null);
+      })
+      .catch(() => {});
+  }, [conversationId, activeProfile]);
+
+  async function handleCall(type: "voice" | "video") {
+    if (!conversationId || !activeProfile || !otherProfile) return;
+    const { call, token, liveKitConfigured } = await startCall({ profileId: activeProfile.id, conversationId, type });
+    setPendingCallSession({
+      token,
+      liveKitConfigured,
+      isCaller: true,
+      otherDisplayName: otherProfile.displayName,
+      otherAvatarUrl: otherProfile.displayPictureUrl,
+    });
+    startOutgoingCallUI(call.id, otherProfile.displayName, type === "video");
+    router.push(`/call/${call.id}`);
+  }
 
   async function handleSend() {
     if (!conversationId || !activeProfile || !draft.trim()) return;
@@ -86,8 +115,15 @@ export default function ConversationScreen() {
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerTitle}>{otherProfile?.displayName ?? "Messages"}</Text>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => handleCall("voice")} hitSlop={8} disabled={!otherProfile}>
+            <Ionicons name="call-outline" size={22} color={otherProfile ? colors.textPrimary : colors.textSecondary} />
+          </Pressable>
+          <Pressable onPress={() => handleCall("video")} hitSlop={8} disabled={!otherProfile}>
+            <Ionicons name="videocam-outline" size={24} color={otherProfile ? colors.textPrimary : colors.textSecondary} />
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
@@ -146,6 +182,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.divider,
   },
   headerTitle: { ...typography.h3, color: colors.textPrimary },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   listPadding: { padding: spacing.lg, flexGrow: 1 },
   bubbleRow: { flexDirection: "row", marginBottom: spacing.xs },
   bubbleRowMine: { justifyContent: "flex-end" },
