@@ -23,7 +23,7 @@ import { uploadMedia } from "../../api/uploads";
 import { safeBack } from "../../lib/navigation";
 import { setPendingCallSession } from "../../lib/activeCallSession";
 import { startOutgoingCallUI } from "../../lib/callKeep";
-import { PageBackground } from "../../components/PageBackground";
+import { ChatWallpaper } from "../../components/ChatWallpaper";
 import type { DirectMessage, ProfileSummary } from "../../types";
 
 const POLL_MS = 4000;
@@ -112,7 +112,7 @@ export default function ConversationScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <PageBackground />
+      <ChatWallpaper />
       <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
