@@ -11,6 +11,9 @@ import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
 
+// Mirrors backend/src/routes/posts.ts's createPostBody caption limit.
+const CAPTION_MAX_LENGTH = 2000;
+
 export default function PostComposerScreen() {
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
@@ -22,15 +25,31 @@ export default function PostComposerScreen() {
   async function pickPhoto() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
+    // allowsEditing hands off to the native crop tool right after picking —
+    // same pattern already used in status-composer.tsx and
+    // business-verification-submit.tsx, rather than a custom editor.
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85, allowsEditing: true });
     if (!result.canceled && result.assets[0]) setMedia({ uri: result.assets[0].uri, type: "image" });
   }
 
   async function pickVideo() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], quality: 0.7, videoMaxDuration: 60 });
+    // allowsEditing on a video gives the native trim tool (start/end
+    // handles) right after picking.
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["videos"],
+      quality: 0.7,
+      videoMaxDuration: 60,
+      allowsEditing: true,
+    });
     if (!result.canceled && result.assets[0]) setMedia({ uri: result.assets[0].uri, type: "video" });
+  }
+
+  function editMedia() {
+    if (!media) return;
+    if (media.type === "image") pickPhoto();
+    else pickVideo();
   }
 
   async function handlePost() {
@@ -82,9 +101,12 @@ export default function PostComposerScreen() {
           placeholderTextColor={colors.textSecondary}
           multiline
           value={caption}
-          onChangeText={setCaption}
+          onChangeText={(v) => setCaption(v.slice(0, CAPTION_MAX_LENGTH))}
         />
       </View>
+      <Text style={styles.counter}>
+        {caption.length}/{CAPTION_MAX_LENGTH}
+      </Text>
 
       {media && (
         <View style={styles.mediaPreviewWrap}>
@@ -95,9 +117,16 @@ export default function PostComposerScreen() {
               <Text style={styles.videoBadge}>Video attached</Text>
             </View>
           )}
-          <Pressable onPress={() => setMedia(null)}>
-            <Text style={styles.removeMedia}>Remove</Text>
-          </Pressable>
+          <View style={styles.mediaActionsRow}>
+            <Pressable onPress={editMedia}>
+              <Text style={styles.editMediaText}>
+                {media.type === "image" ? "Crop/choose again" : "Trim/choose again"}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setMedia(null)}>
+              <Text style={styles.removeMedia}>Remove</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -152,10 +181,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mediaButtonText: { color: colors.primaryDark, fontWeight: "600" },
+  counter: { ...typography.caption, color: colors.textSecondary, textAlign: "right", marginTop: 4 },
   mediaPreviewWrap: { marginTop: spacing.md, alignItems: "center" },
   mediaPreview: { width: "100%", aspectRatio: 1, borderRadius: radii.md, backgroundColor: colors.surfaceAlt },
   videoBadgeWrap: { alignItems: "center", justifyContent: "center" },
   videoBadge: { color: colors.primaryDark, fontWeight: "600" },
-  removeMedia: { color: colors.danger, marginTop: spacing.xs, ...typography.caption },
+  mediaActionsRow: { flexDirection: "row", gap: spacing.lg, marginTop: spacing.xs },
+  editMediaText: { color: colors.primaryDark, ...typography.caption, fontWeight: "600" },
+  removeMedia: { color: colors.danger, ...typography.caption },
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.md, ...typography.caption },
 });
