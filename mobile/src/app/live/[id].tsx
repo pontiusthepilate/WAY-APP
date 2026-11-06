@@ -70,7 +70,6 @@ export default function LiveSessionScreen() {
     // Re-checks only when the broadcaster's id changes, not on every
     // CHAT_POLL_MS session refresh above (which creates a new `session`
     // object each tick even though the broadcaster never changes).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.profile.id]);
 
   // Join/leave viewer presence once we know whether we're watching (not broadcasting).

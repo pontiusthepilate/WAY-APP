@@ -4,6 +4,7 @@ import {
   Dimensions,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -27,11 +28,11 @@ import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../.
 import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
 import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
-import { searchAddress, searchByWayId, searchLocation, searchNearby } from "../../api/search";
+import { searchAddress, searchAll, searchByWayId, searchLocation, searchNearby } from "../../api/search";
 import { startConversation } from "../../api/messages";
 import { updateVisibility } from "../../api/profiles";
 import { getActiveStatusIds } from "../../api/status";
-import type { NearbyResult, ResultView, SearchMode } from "../../types";
+import type { NearbyResult, ResultView, SearchMode, UnifiedSearchResults } from "../../types";
 import { ApiError } from "../../api/client";
 
 const RADAR_SIZE = Math.min(Dimensions.get("window").width - spacing.xl * 2, 340);
@@ -59,6 +60,8 @@ export default function SearchScreen() {
   const [wayIdText, setWayIdText] = useState("");
   const [wayIdCountry, setWayIdCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [allQueryText, setAllQueryText] = useState("");
+  const [unifiedResults, setUnifiedResults] = useState<UnifiedSearchResults | null>(null);
 
   const [results, setResults] = useState<NearbyResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,6 +96,7 @@ export default function SearchScreen() {
     // the two numbers radar placement depends on).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setResults([]);
+    setUnifiedResults(null);
     setError(null);
     if (mode === "wayid" && view === "radar") setView("list");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,7 +137,7 @@ export default function SearchScreen() {
           radiusMeters,
           category: category || undefined,
         });
-      } else {
+      } else if (mode === "wayid") {
         const trimmed = wayIdText.trim();
         if (!trimmed) {
           setError("Enter a WAY ID or phone number to search.");
@@ -147,6 +151,18 @@ export default function SearchScreen() {
           : trimmed;
         next = await searchByWayId({ profileId: activeProfile.id, query });
         if (next.length === 0) setError("No WAY found with that ID or phone number.");
+      } else {
+        const trimmed = allQueryText.trim();
+        if (!trimmed) {
+          setError("Enter a name, business, or podcast to search.");
+          return;
+        }
+        const unified = await searchAll({ profileId: activeProfile.id, query: trimmed });
+        setUnifiedResults(unified);
+        // No setError here even when everything comes back empty — the
+        // dedicated empty state below (driven by unifiedResults itself)
+        // already covers it; setting one too would show the message twice.
+        next = [...unified.people, ...unified.businesses, ...unified.podcasts];
       }
       setResults(next);
     } catch (err) {
@@ -154,7 +170,7 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeProfile, mode, coords, radiusMeters, category, addressText, locationText, wayIdText, wayIdCountry, refreshDeviceLocation]);
+  }, [activeProfile, mode, coords, radiusMeters, category, addressText, locationText, wayIdText, wayIdCountry, allQueryText, refreshDeviceLocation]);
 
   useEffect(() => {
     // Runs the search in response to the device location or mode changing;
@@ -163,6 +179,25 @@ export default function SearchScreen() {
     if (mode === "nearby" && coords) runSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords, mode]);
+
+  // Jumps from a unified-search location suggestion straight into Location
+  // mode, already centered there — reuses the lat/lng this search already
+  // resolved instead of re-geocoding the same text a second time.
+  async function jumpToLocation(loc: { lat: number; lng: number; label: string }) {
+    if (!activeProfile) return;
+    setMode("location");
+    setLocationText(loc.label);
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await searchLocation({ profileId: activeProfile.id, lat: loc.lat, lng: loc.lng, radiusMeters, category: category || undefined });
+      setResults(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function toggleVisibility(next: boolean) {
     if (!activeProfile) return;
@@ -231,6 +266,19 @@ export default function SearchScreen() {
             />
           </View>
         )}
+        {mode === "all" && (
+          <View style={styles.inputWrap}>
+            <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Search people, businesses, podcasts…"
+              placeholderTextColor={colors.textSecondary}
+              value={allQueryText}
+              onChangeText={setAllQueryText}
+              onSubmitEditing={runSearch}
+            />
+          </View>
+        )}
         {mode === "wayid" && (
           <>
             <View style={styles.inputWrap}>
@@ -263,7 +311,7 @@ export default function SearchScreen() {
           </>
         )}
 
-        {mode !== "wayid" && (
+        {mode !== "wayid" && mode !== "all" && (
           <View style={styles.inputWrap}>
             <Ionicons name="pricetag-outline" size={18} color={colors.textSecondary} />
             <TextInput
@@ -276,7 +324,7 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {mode !== "wayid" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
+        {mode !== "wayid" && mode !== "all" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
 
         {mode !== "nearby" && (
           <View style={styles.searchRow}>
@@ -294,15 +342,55 @@ export default function SearchScreen() {
           </View>
         )}
 
-        <ViewToggle value={view} onChange={setView} />
+        {mode !== "all" && <ViewToggle value={view} onChange={setView} />}
       </View>
 
       {(loading || locating) && <ActivityIndicator style={styles.spinner} color={colors.primaryDark} />}
       {error && <Text style={styles.error}>{error}</Text>}
-      {!loading && !error && results.length === 0 && (
+      {!loading && !error && mode !== "all" && results.length === 0 && (
         <Text style={styles.empty}>No connections found in this radius yet.</Text>
       )}
 
+      {mode === "all" ? (
+        <ScrollView style={styles.unifiedList} contentContainerStyle={styles.listPadding} keyboardShouldPersistTaps="handled">
+          {unifiedResults?.location && (
+            <Pressable style={styles.locationShortcut} onPress={() => jumpToLocation(unifiedResults.location!)}>
+              <Ionicons name="earth-outline" size={20} color={colors.primaryDark} />
+              <Text style={styles.locationShortcutText}>{`Search near "${unifiedResults.location.label}"`}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.primaryDark} />
+            </Pressable>
+          )}
+          {unifiedResults && unifiedResults.people.length > 0 && (
+            <View style={styles.unifiedSection}>
+              <Text style={styles.sectionTitle}>People</Text>
+              {unifiedResults.people.map((r) => (
+                <ConnectionRow key={r.id} result={r} onPress={() => setSelected(r)} hasActiveStatus={statusAuthorIds.has(r.id)} />
+              ))}
+            </View>
+          )}
+          {unifiedResults && unifiedResults.businesses.length > 0 && (
+            <View style={styles.unifiedSection}>
+              <Text style={styles.sectionTitle}>Businesses</Text>
+              {unifiedResults.businesses.map((r) => (
+                <ConnectionRow key={r.id} result={r} onPress={() => setSelected(r)} hasActiveStatus={statusAuthorIds.has(r.id)} />
+              ))}
+            </View>
+          )}
+          {unifiedResults && unifiedResults.podcasts.length > 0 && (
+            <View style={styles.unifiedSection}>
+              <Text style={styles.sectionTitle}>Podcasts</Text>
+              {unifiedResults.podcasts.map((r) => (
+                <ConnectionRow key={r.id} result={r} onPress={() => setSelected(r)} hasActiveStatus={statusAuthorIds.has(r.id)} />
+              ))}
+            </View>
+          )}
+          {unifiedResults &&
+            !unifiedResults.location &&
+            unifiedResults.people.length === 0 &&
+            unifiedResults.businesses.length === 0 &&
+            unifiedResults.podcasts.length === 0 && <Text style={styles.empty}>No matches found.</Text>}
+        </ScrollView>
+      ) : (
       <View style={styles.resultsArea}>
         {view === "radar" && (
           <View style={styles.radarWrap}>
@@ -337,6 +425,7 @@ export default function SearchScreen() {
           />
         )}
       </View>
+      )}
 
       <MiniProfileModal
         result={selected}
@@ -366,6 +455,19 @@ const styles = StyleSheet.create({
   visibilityRow: { alignItems: "center" },
   visibilityLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 2 },
   controls: { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  unifiedList: { flex: 1, paddingHorizontal: spacing.lg },
+  unifiedSection: { marginTop: spacing.md },
+  sectionTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs },
+  locationShortcut: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  locationShortcutText: { flex: 1, ...typography.body, color: colors.primaryDark, fontWeight: "600" },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",

@@ -50,8 +50,21 @@ export interface NearbyResult {
   bearingDegrees?: number;
 }
 
-export type SearchMode = "nearby" | "address" | "location" | "wayid";
+export type SearchMode = "nearby" | "address" | "location" | "wayid" | "all";
 export type ResultView = "radar" | "list" | "grid";
+
+// A unified-search result additionally carries its profile kind, to group
+// and label people/businesses/podcasts together in one response.
+export interface SearchEntityResult extends NearbyResult {
+  kind: "personal" | "business" | "podcast";
+}
+
+export interface UnifiedSearchResults {
+  people: SearchEntityResult[];
+  businesses: SearchEntityResult[];
+  podcasts: SearchEntityResult[];
+  location: { lat: number; lng: number; label: string } | null;
+}
 
 export interface ProfileSummary {
   id: string;

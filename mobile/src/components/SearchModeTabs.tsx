@@ -4,6 +4,7 @@ import { colors, radii, spacing, typography } from "../theme/theme";
 import type { SearchMode } from "../types";
 
 const OPTIONS: { key: SearchMode; label: string }[] = [
+  { key: "all", label: "Search" },
   { key: "nearby", label: "Nearby" },
   { key: "address", label: "Address" },
   { key: "location", label: "Location" },
@@ -26,9 +27,10 @@ export function SearchModeTabs({ value, onChange }: { value: SearchMode; onChang
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: spacing.sm },
+  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   tab: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: "30%",
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceAlt,

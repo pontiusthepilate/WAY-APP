@@ -54,6 +54,13 @@ const wayIdQuery = z.object({
   query: z.string().min(1),
 });
 
+const allQuery = z.object({
+  profileId: z.string(),
+  query: z.string().min(1),
+});
+
+const UNIFIED_RESULT_LIMIT = 10;
+
 // A WAY-ID lookup result has no meaningful distance/bearing — it's an exact
 // handle/phone match, not a geo search — so it's shaped like NearbyResult
 // minus those two fields.
@@ -67,6 +74,10 @@ const LOOKUP_SELECT = {
   visibilityImageUrl: true,
   isLocationOverridden: true,
 } as const;
+
+// Unified search (feature: multi-entity search) also needs each result's
+// kind, to group/label people vs. businesses vs. podcasts in one response.
+const UNIFIED_SELECT = { ...LOOKUP_SELECT, kind: true } as const;
 
 // Loose enough to accept "+1 555 123 4567", "555-123-4567", "15551234567",
 // etc.; anything that doesn't look like a phone number is treated as a WayID.
@@ -167,5 +178,44 @@ export async function searchRoutes(app: FastifyInstance) {
       select: LOOKUP_SELECT,
     });
     return profile ? [profile] : [];
+  });
+
+  // E) ALL — unified multi-entity search: one free-text query matched by
+  // name/handle across every profile kind at once, plus (if the query
+  // reads as a place) a jump-to-location shortcut. Unlike nearby/address/
+  // location, this never filters by distance — it's "find X by name"
+  // regardless of where it is, so it only respects the master isVisible
+  // switch, same as WAY ID lookup.
+  app.get("/search/all", { onRequest: [app.authenticate] }, async (req) => {
+    const q = allQuery.parse(req.query);
+    const suppressed = await getSuppressedProfileIds(q.profileId, { includeMuted: false });
+    const nameMatch = { contains: q.query, mode: "insensitive" as const };
+
+    async function findByKind(kind: "personal" | "business" | "podcast") {
+      return prisma.profile.findMany({
+        where: {
+          kind,
+          isVisible: true,
+          id: { not: q.profileId, notIn: suppressed },
+          OR: [{ displayName: nameMatch }, { wayId: nameMatch }],
+        },
+        select: UNIFIED_SELECT,
+        take: UNIFIED_RESULT_LIMIT,
+      });
+    }
+
+    const [people, businesses, podcasts, location] = await Promise.all([
+      findByKind("personal"),
+      findByKind("business"),
+      findByKind("podcast"),
+      q.query.trim().length >= 2
+        ? geocodeAddress(q.query).then(
+            (point) => ({ lat: point.lat, lng: point.lng, label: point.formattedAddress }),
+            () => null // not a resolvable place, geocoding unconfigured, etc. — just omit it
+          )
+        : Promise.resolve(null),
+    ]);
+
+    return { people, businesses, podcasts, location };
   });
 }

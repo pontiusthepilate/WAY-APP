@@ -7,7 +7,7 @@ export class GeocodeConfigError extends Error {}
 // Requires GOOGLE_MAPS_API_KEY (Geocoding API) to be set; the mobile app's
 // LOCATION search instead uses the Google Map picker directly and sends
 // lat/lng straight through, so it doesn't need this.
-export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number }> {
+export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; formattedAddress: string }> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     throw new GeocodeConfigError("GOOGLE_MAPS_API_KEY is not configured on the server");
@@ -20,7 +20,7 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
   const res = await fetch(url.toString());
   const data = (await res.json()) as {
     status: string;
-    results: { geometry: { location: { lat: number; lng: number } } }[];
+    results: { geometry: { location: { lat: number; lng: number } }; formatted_address: string }[];
   };
 
   if (data.status === "ZERO_RESULTS") {
@@ -31,5 +31,5 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
   }
 
   const { lat, lng } = data.results[0].geometry.location;
-  return { lat, lng };
+  return { lat, lng, formattedAddress: data.results[0].formatted_address };
 }

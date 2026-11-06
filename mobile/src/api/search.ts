@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { NearbyResult } from "../types";
+import type { NearbyResult, UnifiedSearchResults } from "../types";
 
 function qs(params: Record<string, string | number | undefined>): string {
   const parts = Object.entries(params)
@@ -41,4 +41,10 @@ export function searchLocation(input: {
 // Exact lookup by WAY ID (username) or phone number — no distance/bearing.
 export function searchByWayId(input: { profileId: string; query: string }) {
   return api.get<NearbyResult[]>(`/search/way-id${qs(input)}`);
+}
+
+// Unified multi-entity search — one free-text query matched by name/handle
+// across every profile kind at once, with no distance filtering.
+export function searchAll(input: { profileId: string; query: string }) {
+  return api.get<UnifiedSearchResults>(`/search/all${qs(input)}`);
 }
