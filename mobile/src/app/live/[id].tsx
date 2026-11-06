@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,7 +25,9 @@ import {
   sendLiveChat,
   startLiveSession,
 } from "../../api/live";
+import { getActiveStatusIds } from "../../api/status";
 import { safeBack } from "../../lib/navigation";
+import { Avatar } from "../../components/Avatar";
 import type { LiveChatMessage, LiveSession } from "../../types";
 
 const CHAT_POLL_MS = 4000;
@@ -41,6 +42,7 @@ export default function LiveSessionScreen() {
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
+  const [broadcasterHasActiveStatus, setBroadcasterHasActiveStatus] = useState(false);
   const hasJoinedRef = useRef(false);
 
   const isBroadcaster = !!activeProfile && !!session && activeProfile.id === session.profileId;
@@ -58,6 +60,18 @@ export default function LiveSessionScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSession();
   }, [loadSession]);
+
+  useEffect(() => {
+    const profileId = session?.profile.id;
+    if (!profileId) return;
+    getActiveStatusIds([profileId])
+      .then((ids) => setBroadcasterHasActiveStatus(ids.includes(profileId)))
+      .catch(() => setBroadcasterHasActiveStatus(false));
+    // Re-checks only when the broadcaster's id changes, not on every
+    // CHAT_POLL_MS session refresh above (which creates a new `session`
+    // object each tick even though the broadcaster never changes).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.profile.id]);
 
   // Join/leave viewer presence once we know whether we're watching (not broadcasting).
   useEffect(() => {
@@ -151,13 +165,14 @@ export default function LiveSessionScreen() {
           )
         ) : (
           <View style={styles.viewerPlaceholder}>
-            {session.profile.displayPictureUrl ? (
-              <Image source={{ uri: session.profile.displayPictureUrl }} style={styles.broadcasterAvatar} />
-            ) : (
-              <View style={[styles.broadcasterAvatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{session.profile.displayName.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <View style={styles.avatarSpacing}>
+              <Avatar
+                uri={session.profile.displayPictureUrl}
+                displayName={session.profile.displayName}
+                size={96}
+                hasActiveStatus={broadcasterHasActiveStatus}
+              />
+            </View>
             <Text style={styles.viewerPlaceholderText}>Live video streaming is coming soon</Text>
             <Text style={styles.viewerPlaceholderSub}>You&apos;re connected — chat and viewer count are live.</Text>
           </View>
@@ -224,9 +239,7 @@ const styles = StyleSheet.create({
   permissionPrompt: { flex: 1, alignItems: "center", justifyContent: "center" },
   permissionText: { ...typography.body, color: colors.primaryLight },
   viewerPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  broadcasterAvatar: { width: 96, height: 96, borderRadius: radii.pill, backgroundColor: colors.primaryLight, marginBottom: spacing.md },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: colors.primaryDark, fontWeight: "700", fontSize: 32 },
+  avatarSpacing: { marginBottom: spacing.md },
   viewerPlaceholderText: { ...typography.h3, color: colors.textOnPrimary, textAlign: "center" },
   viewerPlaceholderSub: { ...typography.caption, color: colors.primaryLight, textAlign: "center", marginTop: spacing.xs },
   overlayTop: {

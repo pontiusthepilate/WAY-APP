@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams } from "expo-router";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { endCameraSession, getCameraSession } from "../../api/remoteCamera";
+import { getActiveStatusIds } from "../../api/status";
 import { safeBack } from "../../lib/navigation";
+import { Avatar } from "../../components/Avatar";
 import type { RemoteCameraSession } from "../../types";
 
 export default function RemoteCameraSessionScreen() {
@@ -17,8 +19,10 @@ export default function RemoteCameraSessionScreen() {
   const [session, setSession] = useState<RemoteCameraSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveNotice, setSaveNotice] = useState(false);
+  const [otherHasActiveStatus, setOtherHasActiveStatus] = useState(false);
 
   const isGranter = !!activeProfile && !!session && activeProfile.id === session.granterId;
+  const other = isGranter ? session?.requester : session?.granter;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -31,6 +35,13 @@ export default function RemoteCameraSessionScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!other) return;
+    getActiveStatusIds([other.id])
+      .then((ids) => setOtherHasActiveStatus(ids.includes(other.id)))
+      .catch(() => setOtherHasActiveStatus(false));
+  }, [other]);
 
   async function handleEnd() {
     if (!id || !activeProfile) return;
@@ -57,8 +68,6 @@ export default function RemoteCameraSessionScreen() {
     );
   }
 
-  const other = isGranter ? session.requester : session.granter;
-
   return (
     <View style={styles.container}>
       <View style={styles.videoArea}>
@@ -72,13 +81,9 @@ export default function RemoteCameraSessionScreen() {
           )
         ) : (
           <View style={styles.viewerPlaceholder}>
-            {other?.displayPictureUrl ? (
-              <Image source={{ uri: other.displayPictureUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{other?.displayName.charAt(0).toUpperCase() ?? "?"}</Text>
-              </View>
-            )}
+            <View style={styles.avatarSpacing}>
+              <Avatar uri={other?.displayPictureUrl ?? null} displayName={other?.displayName ?? "?"} size={96} hasActiveStatus={otherHasActiveStatus} />
+            </View>
             <Text style={styles.viewerPlaceholderText}>Live video streaming is coming soon</Text>
             <Text style={styles.viewerPlaceholderSub}>
               {other?.displayName} granted you access — the connection is live, video just isn&apos;t wired up yet.
@@ -130,9 +135,7 @@ const styles = StyleSheet.create({
   permissionPrompt: { flex: 1, alignItems: "center", justifyContent: "center" },
   permissionText: { ...typography.body, color: colors.primaryLight },
   viewerPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  avatar: { width: 96, height: 96, borderRadius: radii.pill, backgroundColor: colors.primaryLight, marginBottom: spacing.md },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: colors.primaryDark, fontWeight: "700", fontSize: 32 },
+  avatarSpacing: { marginBottom: spacing.md },
   viewerPlaceholderText: { ...typography.h3, color: colors.textOnPrimary, textAlign: "center" },
   viewerPlaceholderSub: { ...typography.caption, color: colors.primaryLight, textAlign: "center", marginTop: spacing.xs },
   overlayTop: { position: "absolute", top: spacing.lg, left: spacing.lg },

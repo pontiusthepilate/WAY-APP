@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Animated, BackHandler, Dimensions, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, BackHandler, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { NearbyResult, Profile } from "../types";
@@ -8,6 +8,8 @@ import { FollowButton } from "./FollowButton";
 import { useSession } from "../context/SessionContext";
 import { createBlock, createReport } from "../api/safety";
 import { getProfileLinks } from "../api/profileLinks";
+import { getActiveStatusIds } from "../api/status";
+import { Avatar } from "./Avatar";
 
 const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   business: "shield-checkmark-outline",
@@ -59,12 +61,16 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [links, setLinks] = useState<Profile[]>([]);
+  const [hasActiveStatus, setHasActiveStatus] = useState(false);
 
   useEffect(() => {
     if (!result) return;
     getProfileLinks(result.id)
       .then(setLinks)
       .catch(() => setLinks([]));
+    getActiveStatusIds([result.id])
+      .then((ids) => setHasActiveStatus(ids.includes(result.id)))
+      .catch(() => setHasActiveStatus(false));
   }, [result]);
 
   useEffect(() => {
@@ -187,14 +193,8 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
           </View>
         )}
 
-        <View style={styles.avatarRing}>
-          {shown.displayPictureUrl ? (
-            <Image source={{ uri: shown.displayPictureUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.fallback]}>
-              <Text style={styles.fallbackText}>{shown.displayName.charAt(0).toUpperCase()}</Text>
-            </View>
-          )}
+        <View style={styles.avatarWrap}>
+          <Avatar uri={shown.displayPictureUrl} displayName={shown.displayName} size={86} hasActiveStatus={hasActiveStatus} />
         </View>
 
         <Text style={styles.name}>{shown.displayName}</Text>
@@ -311,19 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginBottom: spacing.md,
   },
-  avatarRing: {
-    width: 92,
-    height: 92,
-    borderRadius: radii.pill,
-    borderWidth: 3,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.sm,
-  },
-  avatar: { width: 80, height: 80, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
-  fallback: { alignItems: "center", justifyContent: "center" },
-  fallbackText: { color: colors.primaryDark, fontWeight: "700", fontSize: 28 },
+  avatarWrap: { marginBottom: spacing.sm },
   name: { ...typography.h2, color: colors.textPrimary },
   way: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
   followRow: { marginTop: spacing.sm },

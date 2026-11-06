@@ -30,6 +30,7 @@ import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
 import { searchAddress, searchByWayId, searchLocation, searchNearby } from "../../api/search";
 import { startConversation } from "../../api/messages";
 import { updateVisibility } from "../../api/profiles";
+import { getActiveStatusIds } from "../../api/status";
 import type { NearbyResult, ResultView, SearchMode } from "../../types";
 import { ApiError } from "../../api/client";
 
@@ -63,6 +64,13 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<NearbyResult | null>(null);
+  const [statusAuthorIds, setStatusAuthorIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    getActiveStatusIds(results.map((r) => r.id))
+      .then((ids) => setStatusAuthorIds(new Set(ids)))
+      .catch(() => setStatusAuthorIds(new Set()));
+  }, [results]);
 
   // MiniProfileModal is a plain in-tree overlay, not a native Modal, so it no
   // longer covers the floating tab bar on its own (that's a sibling of this
@@ -298,7 +306,13 @@ export default function SearchScreen() {
       <View style={styles.resultsArea}>
         {view === "radar" && (
           <View style={styles.radarWrap}>
-            <RadarView results={results} radiusMeters={radiusMeters} size={RADAR_SIZE} onSelect={setSelected} />
+            <RadarView
+              results={results}
+              radiusMeters={radiusMeters}
+              size={RADAR_SIZE}
+              onSelect={setSelected}
+              statusAuthorIds={statusAuthorIds}
+            />
           </View>
         )}
         {view === "list" && (
@@ -306,7 +320,9 @@ export default function SearchScreen() {
             data={results}
             keyExtractor={(r) => r.id}
             contentContainerStyle={styles.listPadding}
-            renderItem={({ item }) => <ConnectionRow result={item} onPress={() => setSelected(item)} />}
+            renderItem={({ item }) => (
+              <ConnectionRow result={item} onPress={() => setSelected(item)} hasActiveStatus={statusAuthorIds.has(item.id)} />
+            )}
           />
         )}
         {view === "grid" && (
@@ -315,7 +331,9 @@ export default function SearchScreen() {
             keyExtractor={(r) => r.id}
             numColumns={2}
             contentContainerStyle={styles.listPadding}
-            renderItem={({ item }) => <ConnectionGridItem result={item} onPress={() => setSelected(item)} />}
+            renderItem={({ item }) => (
+              <ConnectionGridItem result={item} onPress={() => setSelected(item)} hasActiveStatus={statusAuthorIds.has(item.id)} />
+            )}
           />
         )}
       </View>

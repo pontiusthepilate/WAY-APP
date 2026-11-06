@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line } from "react-native-svg";
 import { LocationPulse } from "./LocationPulse";
-import { colors, radii, typography } from "../theme/theme";
+import { Avatar } from "./Avatar";
+import { colors, typography } from "../theme/theme";
 import type { NearbyResult } from "../types";
 
 const RING_COUNT = 4;
@@ -12,9 +13,10 @@ interface Props {
   radiusMeters: number;
   size: number;
   onSelect: (result: NearbyResult) => void;
+  statusAuthorIds?: Set<string>;
 }
 
-export function RadarView({ results, radiusMeters, size, onSelect }: Props) {
+export function RadarView({ results, radiusMeters, size, onSelect, statusAuthorIds }: Props) {
   const center = size / 2;
   const maxScreenRadius = center - 28; // leave room for avatar bubbles at the edge
   const [sweepAngle] = useState(() => new Animated.Value(0));
@@ -86,13 +88,7 @@ export function RadarView({ results, radiusMeters, size, onSelect }: Props) {
             onPress={() => onSelect(r)}
             style={[styles.avatarWrap, { left: x - 20, top: y - 20 }]}
           >
-            {r.displayPictureUrl ? (
-              <Image source={{ uri: r.displayPictureUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{r.displayName.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <Avatar uri={r.displayPictureUrl} displayName={r.displayName} size={40} hasActiveStatus={statusAuthorIds?.has(r.id)} />
           </Pressable>
         );
       })}
@@ -136,21 +132,5 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 40,
     height: 40,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    backgroundColor: colors.primaryLight,
-  },
-  avatarFallback: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitial: {
-    color: colors.primaryDark,
-    fontWeight: "700",
   },
 });
