@@ -28,6 +28,16 @@ const DISCOVER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const REACTION_TYPES = ["like", "love", "haha", "wow", "sad", "angry"] as const;
 const likeBody = z.object({ profileId: z.string(), type: z.enum(REACTION_TYPES).default("like") });
 const commentBody = z.object({ profileId: z.string(), text: z.string().min(1).max(1000) });
+const shareToProfileBody = z.object({ targetProfileId: z.string() });
+
+// Every post listing/read includes the original it reposts (one level —
+// `sharedFromPost` is never itself a repost, see the share-to-profile route
+// below), so the client can render "Reposted from WAY/x" + the original's
+// own content without a second round trip.
+const POST_INCLUDE = {
+  profile: { select: PROFILE_SUMMARY_SELECT },
+  sharedFromPost: { include: { profile: { select: PROFILE_SUMMARY_SELECT } } },
+} as const;
 
 
 async function withViewerLiked<T extends { id: string }>(posts: T[], viewerProfileId?: string) {
@@ -54,7 +64,7 @@ export async function postRoutes(app: FastifyInstance) {
 
     const post = await prisma.post.create({
       data: body,
-      include: { profile: { select: PROFILE_SUMMARY_SELECT } },
+      include: POST_INCLUDE,
     });
     reply.status(201).send({ ...post, viewerLiked: false, viewerReactionType: null });
   });
@@ -69,7 +79,7 @@ export async function postRoutes(app: FastifyInstance) {
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
       where: suppressed.length ? { profileId: { notIn: suppressed } } : undefined,
       orderBy: { createdAt: "desc" },
-      include: { profile: { select: PROFILE_SUMMARY_SELECT } },
+      include: POST_INCLUDE,
     });
 
     const withLikes = await withViewerLiked(posts, q.viewerProfileId);
@@ -96,7 +106,7 @@ export async function postRoutes(app: FastifyInstance) {
         profile: { isVisible: true },
       },
       orderBy: [{ likesCount: "desc" }, { createdAt: "desc" }],
-      include: { profile: { select: PROFILE_SUMMARY_SELECT } },
+      include: POST_INCLUDE,
     });
 
     const withLikes = await withViewerLiked(posts, q.profileId);
@@ -106,7 +116,7 @@ export async function postRoutes(app: FastifyInstance) {
   app.get("/posts/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { viewerProfileId } = z.object({ viewerProfileId: z.string().optional() }).parse(req.query);
-    const post = await prisma.post.findUnique({ where: { id }, include: { profile: { select: PROFILE_SUMMARY_SELECT } } });
+    const post = await prisma.post.findUnique({ where: { id }, include: POST_INCLUDE });
     if (!post) return reply.status(404).send({ error: "Not found" });
     const [withLikes] = await withViewerLiked([post], viewerProfileId);
     return withLikes;
@@ -121,7 +131,7 @@ export async function postRoutes(app: FastifyInstance) {
       take: q.limit,
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
       orderBy: { createdAt: "desc" },
-      include: { profile: { select: PROFILE_SUMMARY_SELECT } },
+      include: POST_INCLUDE,
     });
 
     const withLikes = await withViewerLiked(posts, q.viewerProfileId);
@@ -199,6 +209,49 @@ export async function postRoutes(app: FastifyInstance) {
     const post = await prisma.post.update({ where: { id }, data: { sharesCount: { increment: 1 } } }).catch(() => null);
     if (!post) return reply.status(404).send({ error: "Not found" });
     reply.send({ sharesCount: post.sharesCount });
+  });
+
+  // Cross-profile content sharing (profile-kind feature phase 3): reposts a
+  // post from one of the caller's own profiles onto another of their own
+  // profiles. Both ends must belong to the caller — this is not a general
+  // repost-anyone's-post feature, same ownership framing as profile links.
+  app.post("/posts/:id/share-to-profile", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    const { targetProfileId } = shareToProfileBody.parse(req.body);
+    await assertOwnsProfile(userId, targetProfileId);
+
+    const source = await prisma.post.findUnique({ where: { id }, include: { profile: true } });
+    if (!source) return reply.status(404).send({ error: "Not found" });
+    if (source.profile.userId !== userId) {
+      return reply.status(403).send({ error: "You can only share your own posts to another of your profiles" });
+    }
+    if (source.profileId === targetProfileId) {
+      return reply.status(400).send({ error: "This post is already on that profile" });
+    }
+
+    // Always point at the original, even when sharing an existing repost —
+    // no repost-of-a-repost chains.
+    const originalId = source.sharedFromPostId ?? source.id;
+
+    const existing = await prisma.post.findFirst({
+      where: { profileId: targetProfileId, sharedFromPostId: originalId },
+      include: POST_INCLUDE,
+    });
+    if (existing) {
+      const [withLikes] = await withViewerLiked([existing]);
+      return reply.send(withLikes);
+    }
+
+    const [repost] = await prisma.$transaction([
+      prisma.post.create({
+        data: { profileId: targetProfileId, type: "repost", sharedFromPostId: originalId },
+        include: POST_INCLUDE,
+      }),
+      prisma.post.update({ where: { id: originalId }, data: { sharesCount: { increment: 1 } } }),
+    ]);
+    const [withLikes] = await withViewerLiked([repost]);
+    reply.status(201).send(withLikes);
   });
 
   app.get("/posts/:id/comments", { onRequest: [app.authenticate] }, async (req) => {

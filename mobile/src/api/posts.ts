@@ -58,6 +58,12 @@ export function registerShare(postId: string) {
   return api.post<{ sharesCount: number }>(`/posts/${postId}/share`);
 }
 
+// Reposts a post from one of the caller's own profiles onto another of
+// their own profiles (profile-kind cross-profile content sharing).
+export function shareToProfile(postId: string, targetProfileId: string) {
+  return api.post<Post>(`/posts/${postId}/share-to-profile`, { targetProfileId });
+}
+
 export function getComments(postId: string, cursor?: string) {
   return api.get<Comment[]>(`/posts/${postId}/comments${qs({ cursor })}`);
 }

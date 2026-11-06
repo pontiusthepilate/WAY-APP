@@ -6,20 +6,27 @@ import type { Post } from "../types";
 const GAP = 2;
 
 export function PostGridItem({ post, size, onPress }: { post: Post; size: number; onPress: () => void }) {
+  // A repost's own type/caption/mediaUrl are null — show the original's.
+  const content = post.type === "repost" && post.sharedFromPost ? post.sharedFromPost : post;
   return (
     <Pressable style={[styles.tile, { width: size, height: size }]} onPress={onPress}>
-      {post.type === "text" ? (
+      {content.type === "text" ? (
         <View style={styles.textTile}>
           <Text style={styles.textTileBody} numberOfLines={4}>
-            {post.caption}
+            {content.caption}
           </Text>
         </View>
       ) : (
-        <Image source={{ uri: post.mediaUrl ?? undefined }} style={styles.media} resizeMode="cover" />
+        <Image source={{ uri: content.mediaUrl ?? undefined }} style={styles.media} resizeMode="cover" />
       )}
-      {post.type === "video" && (
+      {content.type === "video" && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>▶</Text>
+        </View>
+      )}
+      {post.type === "repost" && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>🔁</Text>
         </View>
       )}
     </Pressable>

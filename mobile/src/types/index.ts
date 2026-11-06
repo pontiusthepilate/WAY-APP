@@ -67,7 +67,9 @@ export interface Post {
   id: string;
   profileId: string;
   profile: ProfileSummary;
-  type: PostType;
+  // "repost" is never composed directly (see createPost) — it's only ever
+  // produced by shareToProfile, so it's not part of PostType.
+  type: PostType | "repost";
   mediaUrl: string | null;
   caption: string | null;
   likesCount: number;
@@ -77,6 +79,10 @@ export interface Post {
   viewerLiked: boolean;
   viewerReactionType: ReactionType | null;
   createdAt: string;
+  // A "repost" (type: "repost") has no caption/mediaUrl of its own — render
+  // sharedFromPost's content instead (profile-kind cross-profile sharing).
+  sharedFromPostId: string | null;
+  sharedFromPost: Post | null;
 }
 
 export type ReactionType = "like" | "love" | "haha" | "wow" | "sad" | "angry";

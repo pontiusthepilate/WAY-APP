@@ -5,8 +5,9 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { Post, ReactionType } from "../types";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
-import { getReactionBreakdown, registerShare, registerView, toggleLike } from "../api/posts";
+import { getReactionBreakdown, registerShare, registerView, shareToProfile, toggleLike } from "../api/posts";
 import { Avatar } from "./Avatar";
+import { useSession } from "../context/SessionContext";
 
 const REACTION_EMOJI: Record<ReactionType, string> = {
   like: "❤️",
@@ -27,8 +28,16 @@ interface Props {
 
 export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Props) {
   const router = useRouter();
+  const { profiles, activeProfile } = useSession();
   const viewedRef = useRef(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // For a repost, the header/body below render the ORIGINAL author's
+  // content; the action row (like/comment/share/views) still acts on this
+  // repost's own row, which has its own independent counts.
+  const content = post.type === "repost" && post.sharedFromPost ? post.sharedFromPost : post;
+  const canReshare = activeProfile?.id === post.profileId && profiles.length > 1;
+  const resharesSiblings = profiles.filter((p) => p.id !== post.profileId);
 
   useEffect(() => {
     if (viewedRef.current) return;
@@ -66,7 +75,7 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
 
   async function handleShare() {
     try {
-      await Share.share({ message: post.caption ? `${post.caption}\n\nvia WAY/${post.profile.wayId}` : `WAY/${post.profile.wayId}` });
+      await Share.share({ message: content.caption ? `${content.caption}\n\nvia WAY/${content.profile.wayId}` : `WAY/${content.profile.wayId}` });
       const result = await registerShare(post.id);
       onChange({ ...post, sharesCount: result.sharesCount });
     } catch {
@@ -74,12 +83,31 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
     }
   }
 
+  function handleReshare() {
+    Alert.alert("Share to another profile", "Post this to one of your other profiles", [
+      ...resharesSiblings.map((p) => ({ text: `WAY/${p.wayId}`, onPress: () => doReshare(p.id) })),
+      { text: "Cancel", style: "cancel" as const },
+    ]);
+  }
+
+  async function doReshare(targetProfileId: string) {
+    try {
+      await shareToProfile(post.id, targetProfileId);
+      Alert.alert("Shared", "Posted to your other profile.");
+    } catch {
+      Alert.alert("Couldn't share", "Something went wrong. Try again.");
+    }
+  }
+
   return (
     <View style={styles.card}>
+      {post.type === "repost" && post.sharedFromPost && (
+        <Text style={styles.repostBanner}>🔁 WAY/{post.profile.wayId} shared this</Text>
+      )}
       <View style={styles.header}>
         <Avatar
-          uri={post.profile.displayPictureUrl}
-          displayName={post.profile.displayName}
+          uri={content.profile.displayPictureUrl}
+          displayName={content.profile.displayName}
           size={40}
           hasActiveStatus={hasActiveStatus}
           onPress={
@@ -87,33 +115,33 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
               ? () =>
                   router.push({
                     pathname: "/status/[profileId]",
-                    params: { profileId: post.profile.id, displayName: post.profile.displayName },
+                    params: { profileId: content.profile.id, displayName: content.profile.displayName },
                   })
               : undefined
           }
         />
         <View style={styles.headerText}>
           <Text style={styles.name} numberOfLines={1}>
-            {post.profile.displayName}
-            {post.profile.isVerified ? " ✓" : ""}
+            {content.profile.displayName}
+            {content.profile.isVerified ? " ✓" : ""}
           </Text>
           <Text style={styles.way} numberOfLines={1}>
-            WAY/{post.profile.wayId} · {formatRelativeTime(post.createdAt)}
+            WAY/{content.profile.wayId} · {formatRelativeTime(post.createdAt)}
           </Text>
         </View>
       </View>
 
-      {post.type === "text" ? (
+      {content.type === "text" ? (
         <View style={styles.textPost}>
-          <Text style={styles.textPostBody}>{post.caption}</Text>
+          <Text style={styles.textPostBody}>{content.caption}</Text>
         </View>
       ) : (
         <>
-          {post.caption && <Text style={styles.caption}>{post.caption}</Text>}
-          {post.type === "image" && post.mediaUrl && (
-            <Image source={{ uri: post.mediaUrl }} style={styles.media} resizeMode="cover" />
+          {content.caption && <Text style={styles.caption}>{content.caption}</Text>}
+          {content.type === "image" && content.mediaUrl && (
+            <Image source={{ uri: content.mediaUrl }} style={styles.media} resizeMode="cover" />
           )}
-          {post.type === "video" && post.mediaUrl && <VideoPost uri={post.mediaUrl} />}
+          {content.type === "video" && content.mediaUrl && <VideoPost uri={content.mediaUrl} />}
         </>
       )}
 
@@ -148,6 +176,11 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
           <Text style={styles.actionIcon}>◎</Text>
           <Text style={styles.actionCount}>{post.viewsCount}</Text>
         </View>
+        {canReshare && (
+          <Pressable style={styles.action} onPress={handleReshare} hitSlop={6}>
+            <Text style={styles.actionIcon}>🔁</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -168,6 +201,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
+  repostBanner: { ...typography.caption, color: colors.textSecondary, fontWeight: "600", paddingHorizontal: spacing.md, marginBottom: spacing.xs },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, marginBottom: spacing.sm },
   headerText: { marginLeft: spacing.sm, flex: 1 },
   name: { ...typography.h3, color: colors.textPrimary },

@@ -150,7 +150,7 @@ model Post {
   id            String   @id @default(cuid())
   profileId     String
   profile       Profile  @relation(fields: [profileId], references: [id])
-  type          String // "text" | "image" | "video"
+  type          String // "text" | "image" | "video" | "repost"
   mediaUrl      String?
   caption       String?
   likesCount    Int      @default(0)
@@ -161,6 +161,15 @@ model Post {
 
   likes    Like[]
   comments Comment[]
+
+  // A "repost" (type: "repost") has no caption/mediaUrl of its own — it's a
+  // thin pointer to the original, always re-pointed at the ORIGINAL post
+  // even when reposted via an existing repost (no chains). Cross-profile
+  // content sharing (profile-kind feature phase 3): always owner-to-own-
+  // other-profile, enforced in routes/posts.ts, not at the schema level.
+  sharedFromPostId String?
+  sharedFromPost   Post?   @relation("PostShares", fields: [sharedFromPostId], references: [id])
+  shares           Post[]  @relation("PostShares")
 
   @@index([profileId, createdAt])
   @@index([createdAt])
