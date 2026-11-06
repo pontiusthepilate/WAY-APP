@@ -11,7 +11,8 @@ import { SessionProvider, useSession } from "../context/SessionContext";
 import { usePushRegistration } from "../lib/usePushRegistration";
 import { useCallKeep } from "../lib/callKeep";
 import { WaterRippleOverlay } from "../components/WaterRippleOverlay";
-import { EdgeGlowBorder } from "../components/EdgeGlowBorder";
+import { CometTrail } from "../components/CometTrail";
+import { OrbitDot } from "../components/OrbitDot";
 import { colors } from "../theme/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -83,7 +84,8 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <WaterRippleOverlay>
         <Stack screenOptions={{ headerShown: false }} />
       </WaterRippleOverlay>
-      <EdgeGlowBorder />
+      <OrbitDot />
+      <CometTrail />
     </>
   );
 }

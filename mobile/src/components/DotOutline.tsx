@@ -4,8 +4,9 @@ import Svg, { Rect } from "react-native-svg";
 import { colors } from "../theme/theme";
 
 // A single small, illuminated dot glides around the border of whatever it
-// wraps — the same idea as the screen-edge EdgeGlowBorder, scaled down to a
-// button's own size and run just once per instance, reserved for a screen's
+// wraps — the same traveling-glow idea the screen-edge effect used before it
+// became CometTrail, scaled down to a button's own size and run just once
+// per instance, reserved for a screen's
 // single most important action rather than every control, since each
 // instance needs its own continuously-updating JS-driven animation (SVG
 // strokeDashoffset/strokeOpacity aren't eligible for the native driver).
