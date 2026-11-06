@@ -10,10 +10,14 @@ datasource db {
 // The parent/key identity: a verified phone number or email.
 // A User can hold multiple Profiles (2 free on signup).
 model User {
-  id        String   @id @default(cuid())
-  phone     String?  @unique
-  email     String?  @unique
-  createdAt DateTime @default(now())
+  id        String    @id @default(cuid())
+  phone     String?   @unique
+  email     String?   @unique
+  createdAt DateTime  @default(now())
+  // Deactivation (not a hard delete — see routes/users.ts): login via
+  // /auth/verify-otp is refused once this is set, and the identifier can
+  // never be reclaimed for a new account.
+  deletedAt DateTime?
 
   profiles      Profile[]
   subscriptions Subscription[]
@@ -79,6 +83,25 @@ model Profile {
   visibleToLocation  Boolean @default(true)
   visibilityText     String?
   visibilityImageUrl String?
+
+  // Who can start a new DM with this profile (routes/messages.ts's
+  // POST /conversations). Only gates brand-new conversations — an existing
+  // thread is never retroactively locked out by a later privacy change.
+  messagePrivacy String @default("everyone") // "everyone" | "following" | "no_one"
+
+  // Per-type notification preferences. A preference being false never blocks
+  // the underlying action — it only suppresses the alert (push and/or the
+  // in-app Notification row) for this profile. Accept-confirmation pushes
+  // (way-request accepted, camera access granted) are intentionally ungated
+  // everywhere, since they're a direct response to the user's own action.
+  notifyLikes           Boolean @default(true)
+  notifyComments        Boolean @default(true)
+  notifyFollows         Boolean @default(true)
+  notifyMessages        Boolean @default(true)
+  notifyCalls           Boolean @default(true)
+  notifyLive            Boolean @default(true)
+  notifyWayRequests     Boolean @default(true)
+  notifyCameraRequests  Boolean @default(true)
 
   // Location (feature 5): a profile's displayed location can be overridden to
   // anywhere on earth; actualLat/actualLng always hold the real device location.

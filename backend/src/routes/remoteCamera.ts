@@ -37,13 +37,15 @@ export async function remoteCameraRoutes(app: FastifyInstance) {
       data: { fromProfileId: requester.id, toProfileId: target.id, message: body.message },
     });
 
-    await notifyProfiles(
-      [target.id],
-      `${requester.displayName} wants to see your camera`,
-      body.message ?? "Tap to review the request",
-      { remoteCameraRequestId: request.id }
-    );
-    await prisma.notification.create({ data: { profileId: target.id, type: "camera_request", actorProfileId: requester.id } });
+    if (target.notifyCameraRequests) {
+      await notifyProfiles(
+        [target.id],
+        `${requester.displayName} wants to see your camera`,
+        body.message ?? "Tap to review the request",
+        { remoteCameraRequestId: request.id }
+      );
+      await prisma.notification.create({ data: { profileId: target.id, type: "camera_request", actorProfileId: requester.id } });
+    }
 
     reply.status(201).send(await withRequester(request));
   });

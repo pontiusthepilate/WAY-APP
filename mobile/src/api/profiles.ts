@@ -31,6 +31,29 @@ export function updateVisibility(
   return api.patch<Profile>(`/profiles/${id}/visibility`, input);
 }
 
+export function updateNotificationPrefs(
+  id: string,
+  input: Partial<
+    Pick<
+      Profile,
+      | "notifyLikes"
+      | "notifyComments"
+      | "notifyFollows"
+      | "notifyMessages"
+      | "notifyCalls"
+      | "notifyLive"
+      | "notifyWayRequests"
+      | "notifyCameraRequests"
+    >
+  >
+) {
+  return api.patch<Profile>(`/profiles/${id}/notification-prefs`, input);
+}
+
+export function updatePrivacy(id: string, input: Pick<Profile, "messagePrivacy">) {
+  return api.patch<Profile>(`/profiles/${id}/privacy`, input);
+}
+
 export function updateLocation(
   id: string,
   input: { actualLat: number; actualLng: number; overrideLat?: number; overrideLng?: number }

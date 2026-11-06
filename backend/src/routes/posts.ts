@@ -182,9 +182,12 @@ export async function postRoutes(app: FastifyInstance) {
       prisma.post.update({ where: { id }, data: { likesCount: { increment: 1 } } }),
     ]);
     if (post.profileId !== profileId) {
-      await prisma.notification.create({
-        data: { profileId: post.profileId, type: "like", actorProfileId: profileId, postId: id },
-      });
+      const owner = await prisma.profile.findUnique({ where: { id: post.profileId }, select: { notifyLikes: true } });
+      if (owner?.notifyLikes) {
+        await prisma.notification.create({
+          data: { profileId: post.profileId, type: "like", actorProfileId: profileId, postId: id },
+        });
+      }
     }
     reply.send({ liked: true, reactionType: type, likesCount: post.likesCount });
   });
@@ -283,9 +286,12 @@ export async function postRoutes(app: FastifyInstance) {
       prisma.post.update({ where: { id }, data: { commentsCount: { increment: 1 } } }),
     ]);
     if (post.profileId !== body.profileId) {
-      await prisma.notification.create({
-        data: { profileId: post.profileId, type: "comment", actorProfileId: body.profileId, postId: id },
-      });
+      const owner = await prisma.profile.findUnique({ where: { id: post.profileId }, select: { notifyComments: true } });
+      if (owner?.notifyComments) {
+        await prisma.notification.create({
+          data: { profileId: post.profileId, type: "comment", actorProfileId: body.profileId, postId: id },
+        });
+      }
     }
     const profile = await prisma.profile.findUnique({ where: { id: body.profileId }, select: PROFILE_SUMMARY_SELECT });
     reply.status(201).send({ ...comment, profile });

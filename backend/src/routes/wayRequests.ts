@@ -50,13 +50,15 @@ export async function wayRequestRoutes(app: FastifyInstance) {
       },
     });
 
-    await notifyProfiles(
-      [toProfile.id],
-      `${fromProfile.displayName} sent you a WAY request`,
-      body.text ?? "Tap to review",
-      { wayRequestId: created.id }
-    );
-    await prisma.notification.create({ data: { profileId: toProfile.id, type: "way_request", actorProfileId: fromProfile.id } });
+    if (toProfile.notifyWayRequests) {
+      await notifyProfiles(
+        [toProfile.id],
+        `${fromProfile.displayName} sent you a WAY request`,
+        body.text ?? "Tap to review",
+        { wayRequestId: created.id }
+      );
+      await prisma.notification.create({ data: { profileId: toProfile.id, type: "way_request", actorProfileId: fromProfile.id } });
+    }
 
     reply.status(201).send(await withSender(created));
   });

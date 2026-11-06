@@ -26,7 +26,10 @@ export async function followRoutes(app: FastifyInstance) {
       prisma.profile.update({ where: { id: followerProfileId }, data: { followingCount: { increment: 1 } } }),
       prisma.profile.update({ where: { id: followingId }, data: { followersCount: { increment: 1 } } }),
     ]);
-    await prisma.notification.create({ data: { profileId: followingId, type: "follow", actorProfileId: followerProfileId } });
+    const target = await prisma.profile.findUnique({ where: { id: followingId }, select: { notifyFollows: true } });
+    if (target?.notifyFollows) {
+      await prisma.notification.create({ data: { profileId: followingId, type: "follow", actorProfileId: followerProfileId } });
+    }
     reply.status(201).send({ following: true });
   });
 

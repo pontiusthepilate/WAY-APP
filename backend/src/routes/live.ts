@@ -18,10 +18,17 @@ const chatBody = z.object({ profileId: z.string(), text: z.string().min(1).max(5
 async function notifyFollowers(broadcasterProfileId: string, title: string, body: string, data: Record<string, unknown>) {
   const followers = await prisma.follow.findMany({ where: { followingId: broadcasterProfileId }, select: { followerId: true } });
   const followerIds = followers.map((f) => f.followerId);
-  await notifyProfiles(followerIds, title, body, data);
-  if (followerIds.length) {
+  if (!followerIds.length) return;
+
+  const eligible = await prisma.profile.findMany({
+    where: { id: { in: followerIds }, notifyLive: true },
+    select: { id: true },
+  });
+  const eligibleIds = eligible.map((e) => e.id);
+  await notifyProfiles(eligibleIds, title, body, data);
+  if (eligibleIds.length) {
     await prisma.notification.createMany({
-      data: followerIds.map((profileId) => ({ profileId, type: "go_live", actorProfileId: broadcasterProfileId })),
+      data: eligibleIds.map((profileId) => ({ profileId, type: "go_live", actorProfileId: broadcasterProfileId })),
     });
   }
 }

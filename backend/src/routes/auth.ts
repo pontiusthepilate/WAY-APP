@@ -2,22 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/db";
 import { sendOtp } from "../lib/notify";
+import { generateOtpCode, identifierSchema, verifyAndConsumeOtp } from "../lib/otp";
 
 const OTP_TTL_MINUTES = 10;
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const FREE_PROFILE_LIMIT = 2;
 
-const identifierSchema = z.string().min(3).refine(
-  (v) => v.includes("@") || /^\+?[0-9]{7,15}$/.test(v),
-  "Must be a valid email or phone number (E.164, e.g. +15551234567)"
-);
-
 const requestOtpBody = z.object({ identifier: identifierSchema });
 const verifyOtpBody = z.object({ identifier: identifierSchema, code: z.string().length(6) });
-
-function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
 
 export async function authRoutes(app: FastifyInstance) {
   // Step 1 of sign up/sign in: send a 6-digit code to the phone or email
@@ -42,7 +34,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(429).send({ error: "Please wait before requesting another code", retryAfterSeconds });
     }
 
-    const code = generateCode();
+    const code = generateOtpCode();
     await prisma.otpCode.create({
       data: {
         identifier,
@@ -60,19 +52,18 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/verify-otp", async (req, reply) => {
     const { identifier, code } = verifyOtpBody.parse(req.body);
 
-    const otp = await prisma.otpCode.findFirst({
-      where: { identifier, code, consumed: false, expiresAt: { gt: new Date() } },
-      orderBy: { createdAt: "desc" },
-    });
-    if (!otp) {
+    const verified = await verifyAndConsumeOtp(identifier, code);
+    if (!verified) {
       return reply.status(400).send({ error: "Invalid or expired code" });
     }
-    await prisma.otpCode.update({ where: { id: otp.id }, data: { consumed: true } });
 
     const isEmail = identifier.includes("@");
     let user = await prisma.user.findFirst({
       where: isEmail ? { email: identifier } : { phone: identifier },
     });
+    if (user?.deletedAt) {
+      return reply.status(403).send({ error: "This account has been deleted" });
+    }
     const isNewUser = !user;
     if (!user) {
       user = await prisma.user.create({

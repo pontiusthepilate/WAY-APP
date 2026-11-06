@@ -5,6 +5,7 @@ import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { isBlockedEitherWay } from "../lib/blocking";
 import { assertParticipant } from "../lib/conversations";
+import { notifyProfiles } from "../lib/expoPush";
 
 const startConversationBody = z.object({ profileId: z.string(), withProfileId: z.string() });
 const listQuery = z.object({ profileId: z.string() });
@@ -37,16 +38,38 @@ export async function messageRoutes(app: FastifyInstance) {
     if (body.profileId === body.withProfileId) {
       return reply.status(400).send({ error: "Can't start a conversation with yourself" });
     }
+    // Blocking is safety-critical and always re-checked, unlike the privacy
+    // check below which only applies to a brand-new conversation.
     if (await isBlockedEitherWay(body.profileId, body.withProfileId)) {
       return reply.status(403).send({ error: "You can't message this profile" });
     }
 
     const [profileAId, profileBId] = canonicalPair(body.profileId, body.withProfileId);
-    const conversation = await prisma.conversation.upsert({
+    const existing = await prisma.conversation.findUnique({
       where: { profileAId_profileBId: { profileAId, profileBId } },
-      update: {},
-      create: { profileAId, profileBId },
     });
+    if (existing) return reply.status(201).send(existing);
+
+    // Only a brand-new thread is gated by the target's messagePrivacy — an
+    // existing conversation is never retroactively locked out by a later
+    // privacy change.
+    const target = await prisma.profile.findUnique({ where: { id: body.withProfileId } });
+    if (!target) return reply.status(404).send({ error: "Not found" });
+    if (target.messagePrivacy === "no_one") {
+      return reply.status(403).send({ error: "This profile isn't accepting new messages" });
+    }
+    if (target.messagePrivacy === "following") {
+      // Does the TARGET already follow the SENDER back? i.e. the target
+      // chose to only hear from people they themselves follow.
+      const targetFollowsSender = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: target.id, followingId: body.profileId } },
+      });
+      if (!targetFollowsSender) {
+        return reply.status(403).send({ error: "This profile only accepts messages from people they follow" });
+      }
+    }
+
+    const conversation = await prisma.conversation.create({ data: { profileAId, profileBId } });
     reply.status(201).send(conversation);
   });
 
@@ -107,8 +130,8 @@ export async function messageRoutes(app: FastifyInstance) {
     const { userId } = requireUser(req);
     const { id } = req.params as { id: string };
     const body = sendMessageBody.parse(req.body);
-    await assertOwnsProfile(userId, body.profileId);
-    await assertParticipant(id, body.profileId);
+    const sender = await assertOwnsProfile(userId, body.profileId);
+    const conversation = await assertParticipant(id, body.profileId);
 
     const [message] = await prisma.$transaction([
       prisma.directMessage.create({
@@ -122,6 +145,13 @@ export async function messageRoutes(app: FastifyInstance) {
       }),
       prisma.conversation.update({ where: { id }, data: { lastMessageAt: new Date() } }),
     ]);
+
+    const otherId = conversation.profileAId === body.profileId ? conversation.profileBId : conversation.profileAId;
+    const other = await prisma.profile.findUnique({ where: { id: otherId }, select: { notifyMessages: true } });
+    if (other?.notifyMessages) {
+      await notifyProfiles([otherId], sender.displayName, body.text ?? "Sent a photo", { conversationId: id });
+    }
+
     reply.status(201).send(message);
   });
 }

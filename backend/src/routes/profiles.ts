@@ -38,6 +38,21 @@ const linksBody = z.object({
   linkedProfileIds: z.array(z.string()).max(20),
 });
 
+const notificationPrefsBody = z.object({
+  notifyLikes: z.boolean().optional(),
+  notifyComments: z.boolean().optional(),
+  notifyFollows: z.boolean().optional(),
+  notifyMessages: z.boolean().optional(),
+  notifyCalls: z.boolean().optional(),
+  notifyLive: z.boolean().optional(),
+  notifyWayRequests: z.boolean().optional(),
+  notifyCameraRequests: z.boolean().optional(),
+});
+
+const privacyBody = z.object({
+  messagePrivacy: z.enum(["everyone", "following", "no_one"]).optional(),
+});
+
 const locationBody = z.object({
   actualLat: z.number().min(-90).max(90),
   actualLng: z.number().min(-180).max(180),
@@ -115,6 +130,22 @@ export async function profileRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     await assertOwnsProfile(userId, id);
     const body = visibilityBody.parse(req.body);
+    return prisma.profile.update({ where: { id }, data: body });
+  });
+
+  app.patch("/profiles/:id/notification-prefs", { onRequest: [app.authenticate] }, async (req) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    await assertOwnsProfile(userId, id);
+    const body = notificationPrefsBody.parse(req.body);
+    return prisma.profile.update({ where: { id }, data: body });
+  });
+
+  app.patch("/profiles/:id/privacy", { onRequest: [app.authenticate] }, async (req) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    await assertOwnsProfile(userId, id);
+    const body = privacyBody.parse(req.body);
     return prisma.profile.update({ where: { id }, data: body });
   });
 

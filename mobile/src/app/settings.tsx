@@ -42,6 +42,8 @@ export default function SettingsScreen() {
 
       <Text style={styles.sectionLabel}>Account</Text>
       <Row icon="person-outline" label="Edit profile" onPress={() => router.push("/edit-profile")} />
+      <Row icon="call-outline" label="Account details" onPress={() => router.push("/account")} />
+      <Row icon="lock-closed-outline" label="Privacy" onPress={() => router.push("/privacy")} />
       <Row icon="eye-off-outline" label="Blocked accounts" onPress={() => router.push("/blocked-accounts")} />
       {profiles.length > 1 && (
         <Row icon="link-outline" label="Linked profiles" onPress={() => router.push("/profile-links")} />
@@ -55,6 +57,7 @@ export default function SettingsScreen() {
       )}
 
       <Text style={styles.sectionLabel}>Notifications</Text>
+      <Row icon="options-outline" label="Notification preferences" onPress={() => router.push("/notification-preferences")} />
       <View style={styles.infoRow}>
         <Ionicons name="notifications-outline" size={20} color={colors.textSecondary} />
         <View style={styles.infoRowBody}>
@@ -74,6 +77,9 @@ export default function SettingsScreen() {
           If you&apos;ve denied this before, enable it from the iOS Settings app instead — WAY can&apos;t re-ask directly.
         </Text>
       )}
+
+      <Text style={styles.sectionLabel}>About</Text>
+      <Row icon="information-circle-outline" label="About WAY" onPress={() => router.push("/about")} />
 
       <Pressable style={styles.signOutButton} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign out</Text>

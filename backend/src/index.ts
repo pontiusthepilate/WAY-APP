@@ -8,6 +8,7 @@ import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { authRoutes } from "./routes/auth";
+import { userRoutes } from "./routes/users";
 import { profileRoutes } from "./routes/profiles";
 import { searchRoutes } from "./routes/search";
 import { wayRequestRoutes } from "./routes/wayRequests";
@@ -82,6 +83,7 @@ async function main() {
   });
 
   await app.register(authRoutes);
+  await app.register(userRoutes);
   await app.register(profileRoutes);
   await app.register(searchRoutes);
   await app.register(wayRequestRoutes);

@@ -16,6 +16,15 @@ export interface Profile {
   visibleToLocation: boolean;
   visibilityText: string | null;
   visibilityImageUrl: string | null;
+  messagePrivacy: "everyone" | "following" | "no_one";
+  notifyLikes: boolean;
+  notifyComments: boolean;
+  notifyFollows: boolean;
+  notifyMessages: boolean;
+  notifyCalls: boolean;
+  notifyLive: boolean;
+  notifyWayRequests: boolean;
+  notifyCameraRequests: boolean;
   actualLat: number | null;
   actualLng: number | null;
   displayLat: number | null;

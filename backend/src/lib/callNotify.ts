@@ -10,7 +10,12 @@ import type { Call } from "@prisma/client";
 // the regular push is sent there too since it's harmless and covers the
 // case where the app is already foregrounded.
 export async function notifyIncomingCall(calleeProfileId: string, call: Call, callerDisplayName: string): Promise<void> {
-  const tokens = await prisma.pushToken.findMany({ where: { profileId: calleeProfileId } });
+  const callee = await prisma.profile.findUnique({
+    where: { id: calleeProfileId },
+    select: { notifyCalls: true, pushTokens: { select: { token: true, type: true } } },
+  });
+  if (!callee?.notifyCalls) return;
+  const tokens = callee.pushTokens;
   const data = {
     type: "incoming_call",
     callId: call.id,
