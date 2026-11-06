@@ -33,6 +33,13 @@ export default function AboutScreen() {
       <Row label="Terms of Service" onPress={() => router.push("/terms")} />
       <Row label="Privacy Policy" onPress={() => router.push("/privacy-policy")} />
       <Row label="Support" onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} />
+
+      <Text style={styles.tipsHeading}>Tips</Text>
+      <View style={styles.tipCard}>
+        <Text style={styles.tipText}>
+          Shake your phone while on the Feed to show or hide the auto-scroll playback controls.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -69,4 +76,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   rowLabel: { ...typography.body, color: colors.textPrimary },
+  tipsHeading: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.xs },
+  tipCard: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md },
+  tipText: { ...typography.body, color: colors.textPrimary },
 });

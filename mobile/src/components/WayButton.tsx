@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radii, spacing, typography } from "../theme/theme";
+import { useShakeDetector } from "../lib/useShakeDetector";
 import type { AutoScrollSpeed } from "../types";
 
 const SPEED_OPTIONS: { key: AutoScrollSpeed; label: string }[] = [
@@ -11,10 +12,18 @@ const SPEED_OPTIONS: { key: AutoScrollSpeed; label: string }[] = [
 
 // The on-screen quick-access "WAY Button" (feature: right-middle floating
 // control). Today it only drives feed auto-scroll; it's built to later take
-// on other assigned functions without moving from this spot.
+// on other assigned functions without moving from this spot. Hidden by
+// default — a shake of the device toggles it on screen, and shaking again
+// tucks it away, so it stays out of the way of the feed until wanted.
 export function WayButton({ speed, onChange }: { speed: AutoScrollSpeed; onChange: (speed: AutoScrollSpeed) => void }) {
+  const [visible, setVisible] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const active = speed !== "off";
+
+  useShakeDetector(() => {
+    setVisible((v) => !v);
+    setMenuOpen(false);
+  });
 
   function handlePress() {
     if (active) {
@@ -29,6 +38,8 @@ export function WayButton({ speed, onChange }: { speed: AutoScrollSpeed; onChang
     onChange(next);
     setMenuOpen(false);
   }
+
+  if (!visible) return null;
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
@@ -47,7 +58,7 @@ export function WayButton({ speed, onChange }: { speed: AutoScrollSpeed; onChang
         hitSlop={12}
         accessibilityLabel="WAY Button — auto-scroll"
       >
-        <Text style={[styles.buttonText, active && styles.buttonTextActive]}>{active ? "▐▐" : "W"}</Text>
+        <Text style={[styles.buttonText, active && styles.buttonTextActive]}>{active ? "▐▐" : "•••"}</Text>
       </Pressable>
     </View>
   );

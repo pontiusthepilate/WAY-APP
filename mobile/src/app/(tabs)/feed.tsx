@@ -5,15 +5,19 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, typography } from "../../theme/theme";
 import { PostCard } from "../../components/PostCard";
+import { WayButton } from "../../components/WayButton";
+import { AutoScrollSpotlight } from "../../components/AutoScrollSpotlight";
+import { ShakeTipToast } from "../../components/ShakeTipToast";
 import { LiveRail } from "../../components/LiveRail";
 import { StatusRail } from "../../components/StatusRail";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { useSession } from "../../context/SessionContext";
+import { useAutoScroll } from "../../lib/useAutoScroll";
 import { getDiscoverFeed, getFeed } from "../../api/posts";
 import { getActiveLiveSessions } from "../../api/live";
 import { getUnreadNotificationCount } from "../../api/notifications";
 import { getActiveStatusIds, getStatusFeed } from "../../api/status";
-import type { LiveSession, Post, StatusFeedEntry } from "../../types";
+import type { AutoScrollSpeed, LiveSession, Post, StatusFeedEntry } from "../../types";
 
 // Not as time-sensitive as a chat thread, so a longer interval than
 // live/[id].tsx's 4s chat poll is plenty.
@@ -26,6 +30,36 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useSession();
   const listRef = useRef<FlatList<Post>>(null);
+  const [speed, setSpeed] = useState<AutoScrollSpeed>("off");
+  const [spotlightPost, setSpotlightPost] = useState<Post | null>(null);
+  const lastSpotlightedIdRef = useRef<string | null>(null);
+  // Paused (effective speed "off") while a post is spotlighted, so the list
+  // holds still under it; resumes on its own once the spotlight clears.
+  const autoScrollHandlers = useAutoScroll(listRef, spotlightPost ? "off" : speed);
+
+  // FlatList requires onViewableItemsChanged to keep the same identity
+  // across renders, so it's a stable ref that reads the latest speed/
+  // spotlight state via these mirrored refs rather than closing over them.
+  const speedRef = useRef(speed);
+  const spotlightActiveRef = useRef(false);
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
+  useEffect(() => {
+    spotlightActiveRef.current = !!spotlightPost;
+  }, [spotlightPost]);
+
+  // Auto-scroll's "spotlight": when a post becomes the dominant one on
+  // screen while auto-scrolling, it takes over the screen for a hold (see
+  // AutoScrollSpotlight) instead of just sliding past like a normal scroll.
+  const viewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 80 });
+  const onViewableItemsChangedRef = useRef(({ viewableItems }: { viewableItems: { item: Post }[] }) => {
+    if (speedRef.current === "off" || spotlightActiveRef.current) return;
+    const top = viewableItems[0]?.item;
+    if (!top || top.id === lastSpotlightedIdRef.current) return;
+    lastSpotlightedIdRef.current = top.id;
+    setSpotlightPost(top);
+  });
 
   const [tab, setTab] = useState<FeedTab>("following");
   const [posts, setPosts] = useState<Post[]>([]);
@@ -135,6 +169,9 @@ export default function FeedScreen() {
           <Pressable style={styles.bellButton} onPress={() => router.push("/podcasts")} hitSlop={8}>
             <Ionicons name="mic-outline" size={22} color={colors.primaryDark} />
           </Pressable>
+          <Pressable style={styles.bellButton} onPress={() => router.push("/event-composer")} hitSlop={8}>
+            <Ionicons name="calendar-outline" size={22} color={colors.primaryDark} />
+          </Pressable>
           <Pressable style={styles.bellButton} onPress={() => router.push("/notifications")} hitSlop={8}>
             <Ionicons name="notifications-outline" size={22} color={colors.primaryDark} />
             {unreadCount > 0 && (
@@ -181,6 +218,15 @@ export default function FeedScreen() {
             hasActiveStatus={statusAuthorIds.has(item.profile.id)}
           />
         )}
+        onScroll={(e) => autoScrollHandlers.onScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={32}
+        // FlatList requires these two to keep the same identity across
+        // renders (it logs an error if onViewableItemsChanged changes), so
+        // they're read from refs rather than state/inline functions.
+        // eslint-disable-next-line react-hooks/refs
+        viewabilityConfig={viewabilityConfigRef.current}
+        // eslint-disable-next-line react-hooks/refs
+        onViewableItemsChanged={onViewableItemsChangedRef.current}
         onEndReachedThreshold={0.6}
         onEndReached={loadMore}
         refreshing={refreshing}
@@ -189,6 +235,10 @@ export default function FeedScreen() {
         ListFooterComponent={loading ? <ActivityIndicator color={colors.primaryDark} style={styles.spinner} /> : null}
         contentContainerStyle={[styles.listPadding, posts.length === 0 && styles.emptyContainer]}
       />
+
+      <WayButton speed={speed} onChange={setSpeed} />
+      {spotlightPost && <AutoScrollSpotlight post={spotlightPost} onDismiss={() => setSpotlightPost(null)} />}
+      <ShakeTipToast topOffset={insets.top} />
     </View>
   );
 }

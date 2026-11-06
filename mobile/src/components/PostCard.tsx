@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Alert, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { Post, ReactionType } from "../types";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -135,6 +136,37 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
         <View style={styles.textPost}>
           <Text style={styles.textPostBody}>{content.caption}</Text>
         </View>
+      ) : content.type === "event" ? (
+        <View style={styles.eventCard}>
+          {content.mediaUrl && <Image source={{ uri: content.mediaUrl }} style={styles.eventPhoto} resizeMode="cover" />}
+          <View style={styles.eventBody}>
+            <Text style={styles.eventTitle}>{content.eventTitle}</Text>
+            {content.eventStartsAt && (
+              <View style={styles.eventRow}>
+                <Ionicons name="calendar-outline" size={14} color={colors.primaryDark} />
+                <Text style={styles.eventRowText}>{new Date(content.eventStartsAt).toLocaleString()}</Text>
+              </View>
+            )}
+            {content.eventLocation && (
+              <View style={styles.eventRow}>
+                <Ionicons name="location-outline" size={14} color={colors.primaryDark} />
+                <Text style={styles.eventRowText} numberOfLines={2}>
+                  {content.eventLocation}
+                </Text>
+              </View>
+            )}
+            {content.eventCategories.length > 0 && (
+              <View style={styles.eventCategoryRow}>
+                {content.eventCategories.map((c) => (
+                  <View key={c} style={styles.eventCategoryPill}>
+                    <Text style={styles.eventCategoryLabel}>{c}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            {content.caption && <Text style={styles.eventDescription}>{content.caption}</Text>}
+          </View>
+        </View>
       ) : (
         <>
           {content.caption && <Text style={styles.caption}>{content.caption}</Text>}
@@ -215,6 +247,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   textPostBody: { ...typography.h3, color: colors.primaryDark, textAlign: "center" },
+  eventCard: {
+    marginHorizontal: spacing.md,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radii.md,
+    overflow: "hidden",
+  },
+  eventPhoto: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.surfaceAlt },
+  eventBody: { padding: spacing.md },
+  eventTitle: { ...typography.h3, color: colors.primaryDark, marginBottom: spacing.xs },
+  eventRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  eventRowText: { ...typography.caption, color: colors.primaryDark, flex: 1 },
+  eventCategoryRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.xs },
+  eventCategoryPill: { backgroundColor: colors.surface, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.sm },
+  eventCategoryLabel: { ...typography.caption, color: colors.primaryDark, fontWeight: "600" },
+  eventDescription: { ...typography.body, color: colors.primaryDark, marginTop: spacing.sm },
   actionRow: { flexDirection: "row", paddingHorizontal: spacing.md, marginTop: spacing.sm, gap: spacing.lg },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
   actionIcon: { fontSize: 20, color: colors.textSecondary },

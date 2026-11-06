@@ -197,7 +197,7 @@ model Post {
   id            String   @id @default(cuid())
   profileId     String
   profile       Profile  @relation(fields: [profileId], references: [id])
-  type          String // "text" | "image" | "video" | "repost"
+  type          String // "text" | "image" | "video" | "event" | "repost"
   mediaUrl      String?
   caption       String?
   likesCount    Int      @default(0)
@@ -205,6 +205,19 @@ model Post {
   sharesCount   Int      @default(0)
   viewsCount    Int      @default(0)
   createdAt     DateTime @default(now())
+
+  // Event-only fields (type: "event") — an event is a post with these set,
+  // so it rides the same like/comment/share/view pipeline as any other post
+  // rather than needing its own. `eventLocation` is deliberately free text
+  // (an address, a Google Maps link, a landmark name, "online") rather than
+  // a structured place lookup — matches how loosely people actually
+  // describe where something is. `eventCategories` mirrors
+  // Profile.categories so event search can filter by the same kind of
+  // interest tag people already use to describe themselves.
+  eventTitle      String?
+  eventLocation   String?
+  eventStartsAt   DateTime?
+  eventCategories String[] @default([])
 
   likes    Like[]
   comments Comment[]
@@ -220,6 +233,7 @@ model Post {
 
   @@index([profileId, createdAt])
   @@index([createdAt])
+  @@index([type, eventStartsAt])
 }
 
 // One reaction per (post, profile) — the single unique row's "type" field

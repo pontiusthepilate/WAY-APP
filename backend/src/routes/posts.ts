@@ -7,9 +7,24 @@ import { getSuppressedProfileIds } from "../lib/blocking";
 
 const createPostBody = z.object({
   profileId: z.string(),
-  type: z.enum(["text", "image", "video"]),
+  type: z.enum(["text", "image", "video", "event"]),
   mediaUrl: z.string().url().optional(),
   caption: z.string().max(2000).optional(),
+  // Event-only fields (type: "event"). eventLocation is deliberately free
+  // text — an address, a Google Maps link, a landmark, "online" — rather
+  // than a structured place lookup.
+  eventTitle: z.string().min(1).max(140).optional(),
+  eventLocation: z.string().min(1).max(300).optional(),
+  eventStartsAt: z.coerce.date().optional(),
+  eventCategories: z.array(z.string().min(1).max(30)).max(10).default([]),
+});
+
+const eventsSearchQuery = z.object({
+  q: z.string().max(200).optional(),
+  category: z.string().max(30).optional(),
+  profileId: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20),
 });
 
 const feedQuery = z.object({
@@ -58,8 +73,12 @@ export async function postRoutes(app: FastifyInstance) {
     const body = createPostBody.parse(req.body);
     await assertOwnsProfile(userId, body.profileId);
 
-    if (body.type !== "text" && !body.mediaUrl) {
-      return reply.status(400).send({ error: "mediaUrl is required for image/video posts" });
+    if (body.type === "image" || body.type === "video") {
+      if (!body.mediaUrl) return reply.status(400).send({ error: "mediaUrl is required for image/video posts" });
+    } else if (body.type === "event") {
+      if (!body.eventTitle || !body.eventLocation) {
+        return reply.status(400).send({ error: "eventTitle and eventLocation are required for event posts" });
+      }
     }
 
     const post = await prisma.post.create({
@@ -106,6 +125,40 @@ export async function postRoutes(app: FastifyInstance) {
         profile: { isVisible: true },
       },
       orderBy: [{ likesCount: "desc" }, { createdAt: "desc" }],
+      include: POST_INCLUDE,
+    });
+
+    const withLikes = await withViewerLiked(posts, q.profileId);
+    return { posts: withLikes, nextCursor: posts.length === q.limit ? posts[posts.length - 1].id : null };
+  });
+
+  // Event posts, searchable by free-text (title/location) and/or interest
+  // category — the dedicated events search surface, separate from the
+  // profile-search screen's nearby/address/wayid modes since this searches
+  // posts, not profiles. Upcoming events sort first; undated ones (no
+  // eventStartsAt) sort last, newest first.
+  app.get("/posts/events/search", { onRequest: [app.authenticate] }, async (req) => {
+    const q = eventsSearchQuery.parse(req.query);
+    const suppressed = q.profileId ? await getSuppressedProfileIds(q.profileId) : [];
+
+    const posts = await prisma.post.findMany({
+      take: q.limit,
+      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      where: {
+        type: "event",
+        profile: { isVisible: true },
+        ...(suppressed.length ? { profileId: { notIn: suppressed } } : {}),
+        ...(q.category ? { eventCategories: { has: q.category } } : {}),
+        ...(q.q
+          ? {
+              OR: [
+                { eventTitle: { contains: q.q, mode: "insensitive" } },
+                { eventLocation: { contains: q.q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ eventStartsAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       include: POST_INCLUDE,
     });
 

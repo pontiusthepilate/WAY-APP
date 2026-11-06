@@ -31,8 +31,24 @@ export function getDiscoverFeed(input: { profileId: string; cursor?: string; lim
   return api.get<FeedPage>(`/posts/discover${qs(input)}`);
 }
 
-export function createPost(input: { profileId: string; type: PostType; mediaUrl?: string; caption?: string }) {
+export function createPost(input: {
+  profileId: string;
+  type: PostType;
+  mediaUrl?: string;
+  caption?: string;
+  eventTitle?: string;
+  eventLocation?: string;
+  eventStartsAt?: string;
+  eventCategories?: string[];
+}) {
   return api.post<Post>("/posts", input);
+}
+
+// The events search surface — searches event posts by free text
+// (title/location) and/or interest category, separate from the
+// profile-search screen's nearby/address/wayid modes.
+export function searchEvents(input: { q?: string; category?: string; profileId?: string; cursor?: string; limit?: number }) {
+  return api.get<FeedPage>(`/posts/events/search${qs(input)}`);
 }
 
 export function deletePost(id: string) {

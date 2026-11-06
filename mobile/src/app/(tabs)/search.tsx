@@ -22,6 +22,7 @@ import { ViewToggle } from "../../components/ViewToggle";
 import { SearchModeTabs } from "../../components/SearchModeTabs";
 import { RadiusPicker } from "../../components/RadiusPicker";
 import { MiniProfileModal } from "../../components/MiniProfileModal";
+import { EventSearchPanel } from "../../components/EventSearchPanel";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { DotOutline } from "../../components/DotOutline";
 import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../../components/CountryCodePicker";
@@ -51,6 +52,7 @@ export default function SearchScreen() {
   const { activeProfile, refreshProfiles } = useSession();
   const { coords, refresh: refreshDeviceLocation, loading: locating } = useDeviceLocation();
 
+  const [resultKind, setResultKind] = useState<"profiles" | "events">("profiles");
   const [mode, setMode] = useState<SearchMode>("nearby");
   const [view, setView] = useState<ResultView>("radar");
   const [radiusMeters, setRadiusMeters] = useState(500);
@@ -237,6 +239,25 @@ export default function SearchScreen() {
         </View>
       </View>
 
+      <View style={styles.resultKindRow}>
+        <Pressable
+          style={[styles.resultKindPill, resultKind === "profiles" && styles.resultKindPillActive]}
+          onPress={() => setResultKind("profiles")}
+        >
+          <Text style={[styles.resultKindLabel, resultKind === "profiles" && styles.resultKindLabelActive]}>Profiles</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.resultKindPill, resultKind === "events" && styles.resultKindPillActive]}
+          onPress={() => setResultKind("events")}
+        >
+          <Text style={[styles.resultKindLabel, resultKind === "events" && styles.resultKindLabelActive]}>Events</Text>
+        </Pressable>
+      </View>
+
+      {resultKind === "events" && <EventSearchPanel />}
+
+      {resultKind === "profiles" && (
+      <>
       <View style={styles.controls}>
         <SearchModeTabs value={mode} onChange={setMode} />
 
@@ -426,6 +447,8 @@ export default function SearchScreen() {
         )}
       </View>
       )}
+      </>
+      )}
 
       <MiniProfileModal
         result={selected}
@@ -455,6 +478,17 @@ const styles = StyleSheet.create({
   visibilityRow: { alignItems: "center" },
   visibilityLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 2 },
   controls: { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  resultKindRow: { flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  resultKindPill: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+  },
+  resultKindPillActive: { backgroundColor: colors.primary },
+  resultKindLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "700" },
+  resultKindLabelActive: { color: colors.textOnPrimary },
   unifiedList: { flex: 1, paddingHorizontal: spacing.lg },
   unifiedSection: { marginTop: spacing.md },
   sectionTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs },

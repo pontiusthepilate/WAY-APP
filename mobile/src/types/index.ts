@@ -89,7 +89,7 @@ export interface StatusFeedEntry {
   latestAt: string;
 }
 
-export type PostType = "text" | "image" | "video";
+export type PostType = "text" | "image" | "video" | "event";
 
 export interface Post {
   id: string;
@@ -111,6 +111,13 @@ export interface Post {
   // sharedFromPost's content instead (profile-kind cross-profile sharing).
   sharedFromPostId: string | null;
   sharedFromPost: Post | null;
+  // Event-only fields (type: "event"). eventLocation is free text — an
+  // address, a Google Maps link, a landmark, "online" — not a structured
+  // place lookup.
+  eventTitle: string | null;
+  eventLocation: string | null;
+  eventStartsAt: string | null;
+  eventCategories: string[];
 }
 
 export type ReactionType = "like" | "love" | "haha" | "wow" | "sad" | "angry";
