@@ -87,6 +87,22 @@ export interface Post {
 
 export type ReactionType = "like" | "love" | "haha" | "wow" | "sad" | "angry";
 
+export type EpisodeType = "audio" | "video";
+
+// Podcast-profile content (profile-kind feature phase 4) — a separate model
+// from Post; only a profile with kind "podcast" can own these.
+export interface Episode {
+  id: string;
+  profileId: string;
+  profile: ProfileSummary;
+  title: string;
+  type: EpisodeType;
+  mediaUrl: string;
+  coverImageUrl: string | null;
+  playsCount: number;
+  createdAt: string;
+}
+
 export interface Comment {
   id: string;
   postId: string;

@@ -11,7 +11,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.wayapp.way",
       "infoPlist": {
-        "UIBackgroundModes": ["audio", "voip"]
+        "UIBackgroundModes": [
+          "audio",
+          "voip"
+        ]
       },
       "entitlements": {
         "aps-environment": "development"
@@ -65,13 +68,18 @@
       [
         "@livekit/react-native-expo-plugin",
         {
-          "android": { "audioType": "communication" },
-          "ios": { "addPodSources": true }
+          "android": {
+            "audioType": "communication"
+          },
+          "ios": {
+            "addPodSources": true
+          }
         }
       ],
       "@config-plugins/react-native-webrtc",
       "@config-plugins/react-native-callkeep",
-      "./plugins/withCallKeepMicrophone"
+      "./plugins/withCallKeepMicrophone",
+      "expo-audio"
     ],
     "extra": {
       "router": {},

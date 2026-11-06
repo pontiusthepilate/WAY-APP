@@ -104,7 +104,31 @@ model Profile {
   linksFrom ProfileLink[] @relation("ProfileLinksFrom")
   linksTo   ProfileLink[] @relation("ProfileLinksTo")
 
+  episodes Episode[]
+
   @@index([userId])
+}
+
+// Podcast-profile content (profile-kind feature phase 4) — deliberately
+// separate from Post rather than another Post.type, since episodes have
+// their own required `title` and never go through the regular post
+// composer/feed. Only a profile with kind "podcast" may own these,
+// enforced in routes/episodes.ts, not at the schema level.
+model Episode {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id])
+  title         String
+  type          String // "audio" | "video"
+  mediaUrl      String
+  // Shown behind the decorative looping animation while an audio episode
+  // plays; unused for video episodes (the video frame is the art).
+  coverImageUrl String?
+  playsCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([profileId, createdAt])
+  @@index([createdAt])
 }
 
 // A cross-link from one of a user's own profiles to another, shown to

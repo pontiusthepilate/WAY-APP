@@ -8,6 +8,7 @@ import { colors, radii, spacing, typography } from "../../theme/theme";
 import { PostGridItem } from "../../components/PostGridItem";
 import { useSession } from "../../context/SessionContext";
 import { getProfilePosts } from "../../api/posts";
+import { getProfileEpisodes } from "../../api/episodes";
 import { getScheduledLiveSessions, startLiveSession } from "../../api/live";
 import { getIncomingCameraRequests } from "../../api/remoteCamera";
 import { getIncomingWayRequests } from "../../api/wayRequests";
@@ -16,7 +17,7 @@ import { uploadMedia } from "../../api/uploads";
 import { getActiveStatusIds } from "../../api/status";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { Avatar } from "../../components/Avatar";
-import type { LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../types";
+import type { Episode, LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../types";
 
 const COLUMNS = 3;
 const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
@@ -33,6 +34,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile, profiles, setActiveProfileId, refreshProfiles } = useSession();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [scheduled, setScheduled] = useState<LiveSession[]>([]);
   const [cameraRequests, setCameraRequests] = useState<RemoteCameraRequest[]>([]);
   const [wayRequests, setWayRequests] = useState<WayRequest[]>([]);
@@ -43,18 +45,22 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!activeProfile) return;
     try {
-      const [page, upcoming, incomingCamera, incomingWay, activeStatusIds] = await Promise.all([
+      const [page, upcoming, incomingCamera, incomingWay, activeStatusIds, episodePage] = await Promise.all([
         getProfilePosts(activeProfile.id, { viewerProfileId: activeProfile.id, limit: 50 }).catch(() => ({ posts: [], nextCursor: null })),
         getScheduledLiveSessions(activeProfile.id).catch(() => []),
         getIncomingCameraRequests(activeProfile.id).catch(() => []),
         getIncomingWayRequests(activeProfile.id).catch(() => []),
         getActiveStatusIds([activeProfile.id]).catch((): string[] => []),
+        activeProfile.kind === "podcast"
+          ? getProfileEpisodes(activeProfile.id, { limit: 20 }).catch(() => ({ episodes: [], nextCursor: null }))
+          : Promise.resolve({ episodes: [], nextCursor: null }),
       ]);
       setPosts(page.posts);
       setScheduled(upcoming);
       setCameraRequests(incomingCamera.filter((r) => r.status === "pending"));
       setWayRequests(incomingWay.filter((r) => r.status === "pending"));
       setHasActiveStatus(activeStatusIds.includes(activeProfile.id));
+      setEpisodes(episodePage.episodes);
     } catch {
       setPosts([]);
     }
@@ -256,10 +262,32 @@ export default function ProfileScreen() {
             </View>
           )}
 
+          {activeProfile.kind === "podcast" && episodes.length > 0 && (
+            <View style={styles.upcomingSection}>
+              <Text style={styles.sectionTitle}>Episodes</Text>
+              {episodes.map((ep) => (
+                <Pressable key={ep.id} style={styles.upcomingRow} onPress={() => router.push(`/episode/${ep.id}`)}>
+                  <View style={styles.upcomingInfo}>
+                    <Text style={styles.upcomingTitle}>{ep.title}</Text>
+                    <Text style={styles.upcomingTime}>
+                      {ep.type === "audio" ? "Audio" : "Video"} · {ep.playsCount} plays
+                    </Text>
+                  </View>
+                  <Ionicons name={ep.type === "audio" ? "play-circle-outline" : "videocam-outline"} size={22} color={colors.primary} />
+                </Pressable>
+              ))}
+            </View>
+          )}
+
           <View style={styles.actionsRow}>
             <Pressable style={styles.actionButton} onPress={() => router.push("/post-composer")}>
               <Text style={styles.actionButtonText}>New Post</Text>
             </Pressable>
+            {activeProfile.kind === "podcast" && (
+              <Pressable style={[styles.actionButton, styles.episodeButton]} onPress={() => router.push("/episode-composer")}>
+                <Text style={styles.actionButtonText}>New Episode</Text>
+              </Pressable>
+            )}
             <Pressable style={[styles.actionButton, styles.goLiveButton]} onPress={() => router.push("/go-live")}>
               <Text style={styles.actionButtonText}>Go Live</Text>
             </Pressable>
@@ -372,6 +400,7 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 999, paddingVertical: spacing.sm, alignItems: "center" },
   actionButtonText: { color: colors.textOnPrimary, fontWeight: "700" },
   goLiveButton: { backgroundColor: colors.danger },
+  episodeButton: { backgroundColor: colors.primaryDark },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
   settingsButton: {
     position: "absolute",

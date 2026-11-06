@@ -14,6 +14,15 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/gif": ".gif",
   "video/mp4": ".mp4",
   "video/quicktime": ".mov",
+  // Podcast episode audio (routes/episodes.ts) — picked via
+  // expo-document-picker, so the mime type comes from whatever the OS
+  // reports for the file rather than from a fixed camera-roll export.
+  "audio/mpeg": ".mp3",
+  "audio/mp4": ".m4a",
+  "audio/x-m4a": ".m4a",
+  "audio/wav": ".wav",
+  "audio/x-wav": ".wav",
+  "audio/aac": ".aac",
   // Business verification documents (CAC certificate) are usually a PDF
   // scan, not a photo — see routes/businessVerification.ts.
   "application/pdf": ".pdf",
@@ -38,9 +47,13 @@ export async function uploadRoutes(app: FastifyInstance) {
     // must fall back too, or this produces a relative "/uploads/..." path
     // that fails every URL-shaped validation downstream (documentUrls, etc).
     const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.headers.host}`;
-    reply.status(201).send({
-      url: `${base}/uploads/${filename}`,
-      mediaType: file.mimetype === "application/pdf" ? "document" : file.mimetype.startsWith("video/") ? "video" : "image",
-    });
+    const mediaType = file.mimetype === "application/pdf"
+      ? "document"
+      : file.mimetype.startsWith("video/")
+        ? "video"
+        : file.mimetype.startsWith("audio/")
+          ? "audio"
+          : "image";
+    reply.status(201).send({ url: `${base}/uploads/${filename}`, mediaType });
   });
 }

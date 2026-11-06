@@ -125,6 +125,9 @@ export default function FeedScreen() {
       <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <Text style={styles.headerTitle}>WAY</Text>
         <View style={styles.headerButtons}>
+          <Pressable style={styles.bellButton} onPress={() => router.push("/podcasts")} hitSlop={8}>
+            <Ionicons name="mic-outline" size={22} color={colors.primaryDark} />
+          </Pressable>
           <Pressable style={styles.bellButton} onPress={() => router.push("/notifications")} hitSlop={8}>
             <Ionicons name="notifications-outline" size={22} color={colors.primaryDark} />
             {unreadCount > 0 && (
