@@ -5,16 +5,15 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, typography } from "../../theme/theme";
 import { PostCard } from "../../components/PostCard";
-import { WayButton } from "../../components/WayButton";
 import { LiveRail } from "../../components/LiveRail";
+import { StatusRail } from "../../components/StatusRail";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { useSession } from "../../context/SessionContext";
-import { useAutoScroll } from "../../lib/useAutoScroll";
 import { getDiscoverFeed, getFeed } from "../../api/posts";
 import { getActiveLiveSessions } from "../../api/live";
 import { getUnreadNotificationCount } from "../../api/notifications";
-import { getActiveStatusIds } from "../../api/status";
-import type { AutoScrollSpeed, LiveSession, Post } from "../../types";
+import { getActiveStatusIds, getStatusFeed } from "../../api/status";
+import type { LiveSession, Post, StatusFeedEntry } from "../../types";
 
 // Not as time-sensitive as a chat thread, so a longer interval than
 // live/[id].tsx's 4s chat poll is plenty.
@@ -27,8 +26,6 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useSession();
   const listRef = useRef<FlatList<Post>>(null);
-  const [speed, setSpeed] = useState<AutoScrollSpeed>("off");
-  const autoScrollHandlers = useAutoScroll(listRef, speed);
 
   const [tab, setTab] = useState<FeedTab>("following");
   const [posts, setPosts] = useState<Post[]>([]);
@@ -39,6 +36,7 @@ export default function FeedScreen() {
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [statusAuthorIds, setStatusAuthorIds] = useState<Set<string>>(new Set());
+  const [statusFeed, setStatusFeed] = useState<StatusFeedEntry[]>([]);
 
   // Batched per page — one call for every author on the page, not one per
   // avatar. "replace" on a fresh load (first page/refresh/tab switch) so
@@ -57,6 +55,15 @@ export default function FeedScreen() {
     const poll = setInterval(load, UNREAD_POLL_MS);
     return () => clearInterval(poll);
   }, [activeProfile]);
+
+  // Independent of the following/discover tab — the status rail is always
+  // "my status + who I follow", not scoped to whichever posts are showing.
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeProfile) return;
+      getStatusFeed(activeProfile.id).then(setStatusFeed).catch(() => {});
+    }, [activeProfile])
+  );
 
   const loadFirstPage = useCallback(async () => {
     if (!activeProfile) return;
@@ -161,7 +168,10 @@ export default function FeedScreen() {
         data={posts}
         keyExtractor={(p) => p.id}
         ListHeaderComponent={
-          <LiveRail sessions={liveSessions} onSelect={(session) => router.push(`/live/${session.id}`)} />
+          <View>
+            {activeProfile && <StatusRail entries={statusFeed} activeProfileId={activeProfile.id} />}
+            <LiveRail sessions={liveSessions} onSelect={(session) => router.push(`/live/${session.id}`)} />
+          </View>
         }
         renderItem={({ item }) => (
           <PostCard
@@ -171,8 +181,6 @@ export default function FeedScreen() {
             hasActiveStatus={statusAuthorIds.has(item.profile.id)}
           />
         )}
-        onScroll={(e) => autoScrollHandlers.onScroll(e.nativeEvent.contentOffset.y)}
-        scrollEventThrottle={32}
         onEndReachedThreshold={0.6}
         onEndReached={loadMore}
         refreshing={refreshing}
@@ -181,8 +189,6 @@ export default function FeedScreen() {
         ListFooterComponent={loading ? <ActivityIndicator color={colors.primaryDark} style={styles.spinner} /> : null}
         contentContainerStyle={[styles.listPadding, posts.length === 0 && styles.emptyContainer]}
       />
-
-      <WayButton speed={speed} onChange={setSpeed} />
     </View>
   );
 }
@@ -235,8 +241,8 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", ...typography.caption, marginBottom: spacing.xs },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // Clears the floating, transparent tab bar (see (tabs)/_layout.tsx) so the
-  // last post isn't hidden underneath it.
-  listPadding: { paddingBottom: 90 },
+  // Clears the floating tab bar (see FloatingTabBar.tsx, whose height is
+  // 62 + bottom inset) so the last post isn't hidden underneath it.
+  listPadding: { paddingBottom: 110 },
   spinner: { marginVertical: spacing.lg },
 });

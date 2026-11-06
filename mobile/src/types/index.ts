@@ -83,6 +83,12 @@ export interface ProfileSummary {
   isVerified: boolean;
 }
 
+export interface StatusFeedEntry {
+  profile: ProfileSummary;
+  statusCount: number;
+  latestAt: string;
+}
+
 export type PostType = "text" | "image" | "video";
 
 export interface Post {

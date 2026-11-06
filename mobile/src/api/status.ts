@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Status } from "../types";
+import type { Status, StatusFeedEntry } from "../types";
 
 function qs(params: Record<string, string | number | undefined>): string {
   const parts = Object.entries(params)
@@ -28,6 +28,12 @@ export function getStatusesByProfile(profileId: string) {
 export function getActiveStatusIds(profileIds: string[]) {
   if (!profileIds.length) return Promise.resolve([] as string[]);
   return api.get<string[]>(`/statuses/active-ids${qs({ profileIds: profileIds.join(",") })}`);
+}
+
+// The feed's status rail: active statuses from the viewer's own profile
+// plus everyone they follow, one entry per profile.
+export function getStatusFeed(profileId: string) {
+  return api.get<StatusFeedEntry[]>(`/statuses/feed${qs({ profileId })}`);
 }
 
 export function deleteStatus(id: string) {

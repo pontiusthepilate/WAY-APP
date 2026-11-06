@@ -40,8 +40,9 @@ function useBuoyantFloat(seed: number) {
   const [x] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    const yDuration = 2200 + seed * 260;
-    const xDuration = 2800 + seed * 340;
+    // 2x the original period — same loose, organic wander, just slower.
+    const yDuration = (2200 + seed * 260) * 2;
+    const xDuration = (2800 + seed * 340) * 2;
     const startDelay = seed * 180;
 
     const loopOf = (value: Animated.Value, duration: number, delay: number) =>
@@ -119,6 +120,11 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: "row",
+    // Fully transparent/borderless by design — each tab's own background
+    // shows straight through. What used to make this read as "overlapping"
+    // the feed was the screens' list content not leaving enough bottom
+    // padding to clear the bar (fixed per-screen via listPadding), not a
+    // missing backdrop here.
     backgroundColor: "transparent",
     paddingTop: 8,
   },

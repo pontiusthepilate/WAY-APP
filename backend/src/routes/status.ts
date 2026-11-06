@@ -57,6 +57,45 @@ export async function statusRoutes(app: FastifyInstance) {
     return rows.map((r) => r.profileId);
   });
 
+  // The feed's status rail: one entry per profile with an active status,
+  // scoped to the viewer's own profile plus everyone they follow — not a
+  // global list. The viewer's own entry (if active) always sorts first,
+  // like "My Status" in other apps; everyone else is newest-first.
+  app.get("/statuses/feed", { onRequest: [app.authenticate] }, async (req) => {
+    const { profileId } = z.object({ profileId: z.string() }).parse(req.query);
+    const follows = await prisma.follow.findMany({ where: { followerId: profileId }, select: { followingId: true } });
+    const candidateIds = [profileId, ...follows.map((f) => f.followingId)];
+
+    const statuses = await prisma.status.findMany({
+      where: { profileId: { in: candidateIds }, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Status has no Prisma relation to Profile (just a bare profileId), so
+    // the profile summaries are fetched separately rather than via include.
+    const profiles = await prisma.profile.findMany({
+      where: { id: { in: [...new Set(statuses.map((s) => s.profileId))] } },
+      select: { id: true, wayId: true, displayName: true, displayPictureUrl: true, isVerified: true },
+    });
+    const profileById = new Map(profiles.map((p) => [p.id, p]));
+
+    const byProfile = new Map<string, { profile: (typeof profiles)[number]; statusCount: number; latestAt: Date }>();
+    for (const s of statuses) {
+      const profile = profileById.get(s.profileId);
+      if (!profile) continue;
+      const existing = byProfile.get(s.profileId);
+      if (existing) existing.statusCount += 1;
+      else byProfile.set(s.profileId, { profile, statusCount: 1, latestAt: s.createdAt });
+    }
+
+    const entries = [...byProfile.values()].sort((a, b) => {
+      if (a.profile.id === profileId) return -1;
+      if (b.profile.id === profileId) return 1;
+      return b.latestAt.getTime() - a.latestAt.getTime();
+    });
+    return entries.map((e) => ({ profile: e.profile, statusCount: e.statusCount, latestAt: e.latestAt }));
+  });
+
   app.delete("/statuses/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { userId } = requireUser(req);
     const { id } = req.params as { id: string };

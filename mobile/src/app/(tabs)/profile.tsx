@@ -332,7 +332,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   container: { flex: 1 },
-  listPadding: { paddingBottom: 90 },
+  listPadding: { paddingBottom: 110 },
   header: { alignItems: "center", paddingTop: spacing.xl, paddingHorizontal: spacing.lg },
   avatarWrap: { width: 88, height: 88 },
   avatarMenuBadge: {
