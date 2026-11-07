@@ -15,7 +15,6 @@ import { getEpisode, registerPlay } from "../../api/episodes";
 import { safeBack } from "../../lib/navigation";
 import { Avatar } from "../../components/Avatar";
 import { PodcastVisualizer } from "../../components/PodcastVisualizer";
-import { PageBackgroundVideo } from "../../components/PageBackgroundVideo";
 import type { Episode } from "../../types";
 
 const COVER_SIZE = 220;
@@ -51,7 +50,6 @@ export default function EpisodeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-down" size={26} color={colors.textPrimary} />

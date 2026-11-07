@@ -4,13 +4,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { safeBack } from "../lib/navigation";
-import { PageBackgroundVideo } from "../components/PageBackgroundVideo";
 
 export default function PrivacyPolicyScreen() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
-      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />

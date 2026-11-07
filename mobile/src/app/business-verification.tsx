@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
-import { PageBackgroundVideo } from "../components/PageBackgroundVideo";
 import { useSession } from "../context/SessionContext";
 import { getMyBusinessVerification, type BusinessVerificationRequest } from "../api/businessVerification";
 import { ApiError } from "../api/client";
@@ -35,7 +34,6 @@ export default function BusinessVerificationStatusScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
-      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />

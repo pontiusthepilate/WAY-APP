@@ -6,7 +6,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { safeBack } from "../lib/navigation";
-import { PageBackgroundVideo } from "../components/PageBackgroundVideo";
 import { getMe, deleteAccount, type Me } from "../api/users";
 import { ApiError } from "../api/client";
 
@@ -51,7 +50,6 @@ export default function AccountScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
-      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
