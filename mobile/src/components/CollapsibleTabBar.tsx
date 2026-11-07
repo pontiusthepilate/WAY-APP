@@ -1,7 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, typography } from "../theme/theme";
+
+// A custom chevron instead of the Ionicons glyph — Ionicons' stroke weight
+// is fixed regardless of `size`, which read as a thin line awkwardly
+// crossing the panel's border. Two rotated bars meeting at a point give
+// direct control over how thick those "legs" actually are.
+const CHEVRON_LEG_LENGTH = 20;
+const CHEVRON_THICKNESS = 7; // ~3x an Ionicons glyph's own stroke weight at this size
+
+function BoldChevron({ direction, color }: { direction: "up" | "down"; color: string }) {
+  const leftRotate = direction === "up" ? "45deg" : "-45deg";
+  const rightRotate = direction === "up" ? "-45deg" : "45deg";
+  const leg = { width: CHEVRON_LEG_LENGTH, height: CHEVRON_THICKNESS, borderRadius: CHEVRON_THICKNESS / 2, backgroundColor: color };
+  return (
+    <View style={styles.chevronWrap}>
+      <View style={[leg, { transform: [{ rotate: leftRotate }], marginRight: -CHEVRON_LEG_LENGTH * 0.3 }]} />
+      <View style={[leg, { transform: [{ rotate: rightRotate }], marginLeft: -CHEVRON_LEG_LENGTH * 0.3 }]} />
+    </View>
+  );
+}
 
 // Deliberately not importing expo-router's BottomTabBarProps — its real
 // export path moves around between Expo SDKs and isn't worth chasing down
@@ -73,50 +91,69 @@ function useBuoyantFloat(seed: number) {
 }
 
 // The bottom nav, tucked away behind a small arrow instead of always being
-// on screen. Tap the arrow to bring the 5 tabs up — the exact same bobbing
-// row they used to float in permanently — tap it again (now pointing down)
-// to collapse them back away. Auto-scroll's controls go back to their own
-// shake-to-reveal WAY Button (see WayButton.tsx), fully independent of this.
+// on screen. Collapsed, it's just the chevron floating over whatever the
+// current screen shows — the full screen is visible, "entire phone screen"
+// as normal. Tap it and a solid panel rises to hold the 5 tabs (the same
+// bobbing row they used to float in permanently); its top border is where
+// the visible screen now ends, with the chevron — flipped to point down —
+// straddling that border, its two legs touching the line from above while
+// its tip dips into the panel. Tap it again to collapse back to the plain
+// floating arrow. Auto-scroll's controls stay on their own independent
+// shake-to-reveal WAY Button (see WayButton.tsx).
 export function CollapsibleTabBar({ state, descriptors, navigation, insets }: CollapsibleTabBarProps) {
   const [expanded, setExpanded] = useState(false);
   const bottomPadding = Math.max(insets.bottom, 10);
 
+  const tabs = state.routes.map((route, index) => {
+    const { options } = descriptors[route.key];
+    const isFocused = state.index === index;
+    const color = isFocused
+      ? options.tabBarActiveTintColor ?? colors.primaryDark
+      : options.tabBarInactiveTintColor ?? colors.textSecondary;
+    const label = options.title ?? route.name;
+
+    function onPress() {
+      const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name);
+      }
+    }
+
+    return (
+      <FloatingTab key={route.key} onPress={onPress} seed={index}>
+        {options.tabBarIcon?.({ focused: isFocused, color: color as string, size: 24 })}
+        <Text style={[styles.label, { color }]}>{label}</Text>
+      </FloatingTab>
+    );
+  });
+
+  if (expanded) {
+    return (
+      <View style={[styles.panel, { paddingBottom: bottomPadding }]} pointerEvents="box-none">
+        <Pressable
+          style={styles.arrowOnBorder}
+          onPress={() => setExpanded(false)}
+          hitSlop={16}
+          accessibilityLabel="Hide navigation"
+        >
+          <BoldChevron direction="down" color={colors.primary} />
+        </Pressable>
+        <View style={styles.row} pointerEvents="box-none">
+          {tabs}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {expanded && (
-        <View style={styles.row} pointerEvents="box-none">
-          {state.routes.map((route, index) => {
-            const { options } = descriptors[route.key];
-            const isFocused = state.index === index;
-            const color = isFocused
-              ? options.tabBarActiveTintColor ?? colors.primaryDark
-              : options.tabBarInactiveTintColor ?? colors.textSecondary;
-            const label = options.title ?? route.name;
-
-            function onPress() {
-              const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-            }
-
-            return (
-              <FloatingTab key={route.key} onPress={onPress} seed={index}>
-                {options.tabBarIcon?.({ focused: isFocused, color: color as string, size: 24 })}
-                <Text style={[styles.label, { color }]}>{label}</Text>
-              </FloatingTab>
-            );
-          })}
-        </View>
-      )}
-
       <Pressable
-        style={[styles.arrowButton, { marginBottom: bottomPadding }]}
-        onPress={() => setExpanded((v) => !v)}
+        style={[styles.arrowFloating, { marginBottom: bottomPadding }]}
+        onPress={() => setExpanded(true)}
         hitSlop={16}
-        accessibilityLabel={expanded ? "Hide navigation" : "Show navigation"}
+        accessibilityLabel="Show navigation"
       >
-        <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={28} color={colors.primaryDark} />
+        <BoldChevron direction="up" color={colors.primary} />
       </Pressable>
     </View>
   );
@@ -131,29 +168,57 @@ function FloatingTab({ onPress, seed, children }: { onPress: () => void; seed: n
   );
 }
 
+const ARROW_SIZE = 40;
+
 const styles = StyleSheet.create({
+  chevronWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   container: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center" },
+  // Opaque on purpose — collapsed, the real screen content runs all the way
+  // to the bottom; expanded, this panel's top border is deliberately where
+  // the visible screen now "ends", so it can't be translucent/see-through.
+  panel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.background,
+    borderTopWidth: 2,
+    borderTopColor: colors.primary,
+  },
   row: {
     flexDirection: "row",
     width: "100%",
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xs,
   },
   tab: { flex: 1, alignItems: "center", justifyContent: "flex-start" },
   tabContent: { alignItems: "center", gap: 2 },
   label: { ...typography.caption, fontWeight: "600" },
-  // Just the chevron glyph — no button shape behind it, per explicit
-  // request. The shadow keeps it readable over busy/photo backgrounds
-  // without needing a solid backing shape.
-  arrowButton: {
-    width: 44,
-    height: 36,
+  // Just the chevron glyph — no button shape behind it. The shadow keeps it
+  // readable over busy/photo backgrounds without needing a backing shape.
+  arrowFloating: {
+    width: ARROW_SIZE + 8,
+    height: ARROW_SIZE,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
+  },
+  // Straddles the panel's own top border — negative top offset by half its
+  // height pulls it up so the chevron's two legs sit right on the border
+  // line (reading as touching it) while its downward tip dips just inside
+  // the panel.
+  arrowOnBorder: {
+    position: "absolute",
+    top: -(ARROW_SIZE / 2),
+    left: "50%",
+    marginLeft: -(ARROW_SIZE + 8) / 2,
+    width: ARROW_SIZE + 8,
+    height: ARROW_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
