@@ -464,7 +464,9 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listPadding: { paddingBottom: 110 },
+  // The floating nav icons now wander the whole screen instead of
+  // reserving a fixed bottom strip, so content extends to the true bottom.
+  listPadding: { paddingBottom: spacing.xl },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -546,10 +548,5 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.sm, ...typography.caption },
   empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.md, ...typography.body },
   resultsArea: { flex: 1, marginTop: spacing.sm },
-  // The bottom tab bar floats over the content (see (tabs)/_layout.tsx)
-  // rather than pushing it up, so centering across the full flex:1 height
-  // would center behind it. The same paddingBottom the list/grid views
-  // already use (listPadding) keeps the center point in the space that's
-  // actually visible above the tab bar.
-  radarWrap: { alignItems: "center", justifyContent: "center", flex: 1, paddingBottom: 110 },
+  radarWrap: { alignItems: "center", justifyContent: "center", flex: 1, paddingBottom: spacing.xl },
 });

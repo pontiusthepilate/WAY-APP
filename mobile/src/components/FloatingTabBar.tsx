@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions, type ColorValue } from "react-native";
 import { colors, typography } from "../theme/theme";
 
 // Deliberately not importing expo-router's BottomTabBarProps — its real
@@ -26,58 +26,79 @@ export interface FloatingTabBarProps {
     navigate: (name: string) => void;
     emit: (event: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
   };
-  insets: { bottom: number };
+  insets: { top: number; bottom: number };
 }
 
-// Each tab bobs and drifts on its own independent loop — different period
-// and phase per icon (derived from its index) so five icons together read
-// as separate buoys riding the same gentle swell, not one rigid shape
-// moving in lockstep. Vertical bob and horizontal drift are driven by two
-// separate Animated.Values per icon (different durations) so the combined
-// path is a loose, organic wander rather than a straight up-down bounce.
-function useBuoyantFloat(seed: number) {
-  const [y] = useState(() => new Animated.Value(0));
-  const [x] = useState(() => new Animated.Value(0));
+const ICON_BOX = 72;
+const EDGE_MARGIN = 10;
+const TOP_MARGIN = 12;
+const BOTTOM_MARGIN = 12;
+const LEG_MIN_MS = 7000;
+const LEG_RANGE_MS = 5000;
+
+interface Zone {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+// Each of the 5 icons wanders freely over the ENTIRE screen width but is
+// confined to its own horizontal band top-to-bottom (band 0 = top fifth for
+// the first tab, band 4 = bottom fifth for the last) — collectively they
+// cover the whole screen the way a fixed bottom bar never could, while the
+// banding guarantees two icons can never collide or stack on each other.
+// Within its band an icon picks a new random point, eases to it over a few
+// seconds, then picks another — an open-ended wander, not a repeating loop.
+function useRandomWander(zone: Zone, seed: number) {
+  const [pos] = useState(() => new Animated.ValueXY({ x: (zone.xMin + zone.xMax) / 2, y: (zone.yMin + zone.yMax) / 2 }));
 
   useEffect(() => {
-    // 2x the original period — same loose, organic wander, just slower.
-    const yDuration = (2200 + seed * 260) * 2;
-    const xDuration = (2800 + seed * 340) * 2;
-    const startDelay = seed * 180;
+    let cancelled = false;
+    let startTimer: ReturnType<typeof setTimeout>;
 
-    const loopOf = (value: Animated.Value, duration: number, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(value, { toValue: 1, duration, delay, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(value, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ])
-      );
+    function wanderOnce() {
+      if (cancelled) return;
+      const targetX = zone.xMin + Math.random() * Math.max(0, zone.xMax - zone.xMin);
+      const targetY = zone.yMin + Math.random() * Math.max(0, zone.yMax - zone.yMin);
+      const duration = LEG_MIN_MS + Math.random() * LEG_RANGE_MS;
+      Animated.timing(pos, {
+        toValue: { x: targetX, y: targetY },
+        duration,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && !cancelled) wanderOnce();
+      });
+    }
 
-    const yLoop = loopOf(y, yDuration, startDelay);
-    const xLoop = loopOf(x, xDuration, startDelay + 120);
-    yLoop.start();
-    xLoop.start();
+    // Staggered starts so five icons don't all change direction in lockstep.
+    startTimer = setTimeout(wanderOnce, seed * 350);
     return () => {
-      yLoop.stop();
-      xLoop.stop();
+      cancelled = true;
+      clearTimeout(startTimer);
+      pos.stopAnimation();
     };
-  }, [x, y, seed]);
+    // zone is a freshly computed object every render (derived from window
+    // size), so it's intentionally excluded — only its values matter, and
+    // those only change on rotation/resize, not worth restarting wander for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed]);
 
-  const bobHeight = 4 + (seed % 3) * 1.5; // px
-  const driftWidth = 3 + ((seed + 2) % 3) * 1.3; // px
-  const translateY = y.interpolate({ inputRange: [0, 1], outputRange: [bobHeight, -bobHeight] });
-  const translateX = x.interpolate({ inputRange: [0, 1], outputRange: [-driftWidth, driftWidth] });
-  // A faint tilt tied to the vertical bob — like a buoy leaning as it rises
-  // and falls, not just sliding straight up and down.
-  const rotate = y.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] });
-
-  return { transform: [{ translateY }, { translateX }, { rotate }] };
+  return pos;
 }
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: FloatingTabBarProps) {
-  const bottomPadding = Math.max(insets.bottom, 10);
+  const { width, height } = useWindowDimensions();
+  const topInset = insets.top + TOP_MARGIN;
+  const bottomInset = Math.max(insets.bottom, 10) + BOTTOM_MARGIN;
+  const usableHeight = Math.max(0, height - topInset - bottomInset - ICON_BOX);
+  const bandHeight = usableHeight / state.routes.length;
+  const xMin = EDGE_MARGIN;
+  const xMax = Math.max(xMin, width - ICON_BOX - EDGE_MARGIN);
+
   return (
-    <View style={[styles.bar, { paddingBottom: bottomPadding, height: 62 + bottomPadding }]} pointerEvents="box-none">
+    <View style={styles.overlay} pointerEvents="box-none">
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
@@ -85,6 +106,8 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Float
           ? options.tabBarActiveTintColor ?? colors.primaryDark
           : options.tabBarInactiveTintColor ?? colors.textSecondary;
         const label = options.title ?? route.name;
+        const yMin = topInset + index * bandHeight;
+        const zone: Zone = { xMin, xMax, yMin, yMax: yMin + bandHeight };
 
         function onPress() {
           const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
@@ -94,7 +117,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Float
         }
 
         return (
-          <FloatingTab key={route.key} onPress={onPress} seed={index}>
+          <FloatingTab key={route.key} onPress={onPress} seed={index} zone={zone}>
             {options.tabBarIcon?.({ focused: isFocused, color: color as string, size: 24 })}
             <Text style={[styles.label, { color }]}>{label}</Text>
           </FloatingTab>
@@ -104,31 +127,34 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Float
   );
 }
 
-function FloatingTab({ onPress, seed, children }: { onPress: () => void; seed: number; children: React.ReactNode }) {
-  const floatStyle = useBuoyantFloat(seed);
+function FloatingTab({
+  onPress,
+  seed,
+  zone,
+  children,
+}: {
+  onPress: () => void;
+  seed: number;
+  zone: Zone;
+  children: React.ReactNode;
+}) {
+  const pos = useRandomWander(zone, seed);
   return (
-    <Pressable style={styles.tab} onPress={onPress} hitSlop={8}>
-      <Animated.View style={[styles.tabContent, floatStyle]}>{children}</Animated.View>
-    </Pressable>
+    <Animated.View style={[styles.tab, { transform: pos.getTranslateTransform() }]}>
+      {/* A moving target needs a far more forgiving tap zone than a static
+          button ever would — hitSlop is generous on purpose. */}
+      <Pressable style={styles.tabPressable} onPress={onPress} hitSlop={28}>
+        {children}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    // Fully transparent/borderless by design — each tab's own background
-    // shows straight through. What used to make this read as "overlapping"
-    // the feed was the screens' list content not leaving enough bottom
-    // padding to clear the bar (fixed per-screen via listPadding), not a
-    // missing backdrop here.
-    backgroundColor: "transparent",
-    paddingTop: 8,
-  },
-  tab: { flex: 1, alignItems: "center", justifyContent: "flex-start" },
-  tabContent: { alignItems: "center", gap: 2 },
+  // Covers the full screen now, not just a bottom strip — each icon is
+  // positioned absolutely within it via its own animated transform.
+  overlay: StyleSheet.absoluteFill,
+  tab: { position: "absolute", left: 0, top: 0, width: ICON_BOX },
+  tabPressable: { alignItems: "center", gap: 2 },
   label: { ...typography.caption, fontWeight: "600" },
 });

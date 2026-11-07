@@ -64,7 +64,9 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   title: { ...typography.h1, color: colors.primaryDark, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  listPadding: { paddingBottom: 110, paddingHorizontal: spacing.lg },
+  // The floating nav icons now wander the whole screen instead of
+  // reserving a fixed bottom strip, so content extends to the true bottom.
+  listPadding: { paddingBottom: spacing.xl, paddingHorizontal: spacing.lg },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm },
   avatar: { width: 52, height: 52, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
   avatarFallback: { alignItems: "center", justifyContent: "center" },

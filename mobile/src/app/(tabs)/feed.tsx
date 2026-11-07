@@ -291,8 +291,8 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", ...typography.caption, marginBottom: spacing.xs },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // Clears the floating tab bar (see FloatingTabBar.tsx, whose height is
-  // 62 + bottom inset) so the last post isn't hidden underneath it.
-  listPadding: { paddingBottom: 110 },
+  // The floating nav icons now wander the whole screen instead of
+  // reserving a fixed bottom strip, so content extends to the true bottom.
+  listPadding: { paddingBottom: spacing.xl },
   spinner: { marginVertical: spacing.lg },
 });
