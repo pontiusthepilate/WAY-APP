@@ -92,9 +92,7 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   container: { flex: 1 },
-  // The floating nav icons now wander the whole screen instead of
-  // reserving a fixed bottom strip, so content extends to the true bottom.
-  listPadding: { paddingBottom: spacing.xl },
+  listPadding: { paddingBottom: 110 },
   headerTitle: { ...typography.h1, color: colors.primaryDark, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   balanceRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm },
   balanceCard: {

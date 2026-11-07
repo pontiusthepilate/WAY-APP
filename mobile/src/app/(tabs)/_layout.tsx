@@ -2,12 +2,12 @@ import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/theme";
-import { FloatingTabBar } from "../../components/FloatingTabBar";
+import { CollapsibleTabBar } from "../../components/CollapsibleTabBar";
 
 export default function TabsLayout() {
   return (
     <Tabs
-      tabBar={(props) => <FloatingTabBar {...props} />}
+      tabBar={(props) => <CollapsibleTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primaryDark,

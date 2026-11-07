@@ -464,9 +464,7 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // The floating nav icons now wander the whole screen instead of
-  // reserving a fixed bottom strip, so content extends to the true bottom.
-  listPadding: { paddingBottom: spacing.xl },
+  listPadding: { paddingBottom: 110 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -548,5 +546,5 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", marginTop: spacing.sm, ...typography.caption },
   empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.md, ...typography.body },
   resultsArea: { flex: 1, marginTop: spacing.sm },
-  radarWrap: { alignItems: "center", justifyContent: "center", flex: 1, paddingBottom: spacing.xl },
+  radarWrap: { alignItems: "center", justifyContent: "center", flex: 1, paddingBottom: 110 },
 });
