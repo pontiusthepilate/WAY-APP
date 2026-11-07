@@ -218,6 +218,10 @@ model Post {
   eventLocation   String?
   eventStartsAt   DateTime?
   eventCategories String[] @default([])
+  // Post.mediaUrl doubles as the event's cover photo/video; this says which
+  // it is, mirroring the top-level type field's own image/video distinction
+  // since "event" itself doesn't tell you that.
+  eventMediaType  String? // "image" | "video"
 
   likes    Like[]
   comments Comment[]

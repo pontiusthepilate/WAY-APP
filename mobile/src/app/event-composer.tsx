@@ -40,7 +40,7 @@ export default function EventComposerScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [description, setDescription] = useState("");
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [media, setMedia] = useState<{ uri: string; type: "image" | "video" } | null>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +52,27 @@ export default function EventComposerScreen() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85, allowsEditing: true });
-    if (!result.canceled && result.assets[0]) setPhoto(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) setMedia({ uri: result.assets[0].uri, type: "image" });
+  }
+
+  async function pickVideo() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    // allowsEditing on a video gives the native trim tool (start/end
+    // handles) right after picking — same pattern as post-composer.tsx.
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["videos"],
+      quality: 0.7,
+      videoMaxDuration: 60,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) setMedia({ uri: result.assets[0].uri, type: "video" });
+  }
+
+  function editMedia() {
+    if (!media) return;
+    if (media.type === "image") pickPhoto();
+    else pickVideo();
   }
 
   async function handlePost() {
@@ -64,7 +84,7 @@ export default function EventComposerScreen() {
     setPosting(true);
     setError(null);
     try {
-      const uploaded = photo ? await uploadMedia({ uri: photo, type: "image" }) : null;
+      const uploaded = media ? await uploadMedia(media) : null;
       await createPost({
         profileId: activeProfile.id,
         type: "event",
@@ -74,6 +94,7 @@ export default function EventComposerScreen() {
         eventCategories: categories,
         caption: description.trim() || undefined,
         mediaUrl: uploaded?.url,
+        eventMediaType: uploaded?.mediaType,
       });
       safeBack();
     } catch (err) {
@@ -164,23 +185,38 @@ export default function EventComposerScreen() {
         {description.length}/{DESCRIPTION_MAX_LENGTH}
       </Text>
 
-      {photo ? (
+      {media ? (
         <View style={styles.photoPreviewWrap}>
-          <Image source={{ uri: photo }} style={styles.photoPreview} />
+          {media.type === "image" ? (
+            <Image source={{ uri: media.uri }} style={styles.photoPreview} />
+          ) : (
+            <View style={[styles.photoPreview, styles.videoBadgeWrap]}>
+              <Ionicons name="videocam" size={28} color={colors.primaryDark} />
+              <Text style={styles.videoBadge}>Video attached</Text>
+            </View>
+          )}
           <View style={styles.photoActionsRow}>
-            <Pressable onPress={pickPhoto}>
-              <Text style={styles.editPhotoText}>Crop/choose again</Text>
+            <Pressable onPress={editMedia}>
+              <Text style={styles.editPhotoText}>
+                {media.type === "image" ? "Crop/choose again" : "Trim/choose again"}
+              </Text>
             </Pressable>
-            <Pressable onPress={() => setPhoto(null)}>
+            <Pressable onPress={() => setMedia(null)}>
               <Text style={styles.removePhoto}>Remove</Text>
             </Pressable>
           </View>
         </View>
       ) : (
-        <Pressable style={styles.photoButton} onPress={pickPhoto}>
-          <Ionicons name="image-outline" size={18} color={colors.primaryDark} />
-          <Text style={styles.photoButtonText}>Add cover photo</Text>
-        </Pressable>
+        <View style={styles.mediaRow}>
+          <Pressable style={styles.photoButton} onPress={pickPhoto}>
+            <Ionicons name="image-outline" size={18} color={colors.primaryDark} />
+            <Text style={styles.photoButtonText}>Add cover photo</Text>
+          </Pressable>
+          <Pressable style={styles.photoButton} onPress={pickVideo}>
+            <Ionicons name="videocam-outline" size={18} color={colors.primaryDark} />
+            <Text style={styles.photoButtonText}>Add cover video</Text>
+          </Pressable>
+        </View>
       )}
 
       {error && <Text style={styles.error}>{error}</Text>}
@@ -235,12 +271,13 @@ const styles = StyleSheet.create({
   },
   textArea: { minHeight: 90, textAlignVertical: "top", paddingBottom: spacing.md, ...typography.body, color: colors.textPrimary },
   counter: { ...typography.caption, color: colors.textSecondary, textAlign: "right", marginTop: 4 },
+  mediaRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
   photoButton: {
+    flex: 1,
     flexDirection: "row",
     gap: spacing.xs,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 999,
     borderWidth: 1,
@@ -249,6 +286,8 @@ const styles = StyleSheet.create({
   photoButtonText: { color: colors.primaryDark, fontWeight: "600" },
   photoPreviewWrap: { marginTop: spacing.md, alignItems: "center" },
   photoPreview: { width: "100%", aspectRatio: 16 / 9, borderRadius: radii.md, backgroundColor: colors.surfaceAlt },
+  videoBadgeWrap: { alignItems: "center", justifyContent: "center", gap: spacing.xs },
+  videoBadge: { color: colors.primaryDark, fontWeight: "600" },
   photoActionsRow: { flexDirection: "row", gap: spacing.lg, marginTop: spacing.xs },
   editPhotoText: { color: colors.primaryDark, ...typography.caption, fontWeight: "600" },
   removePhoto: { color: colors.danger, ...typography.caption },

@@ -98,7 +98,14 @@ export function EventSearchPanel() {
         contentContainerStyle={styles.listPadding}
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => router.push(`/post/${item.id}`)}>
-            {item.mediaUrl && <Image source={{ uri: item.mediaUrl }} style={styles.cardPhoto} resizeMode="cover" />}
+            {item.mediaUrl &&
+              (item.eventMediaType === "video" ? (
+                <View style={[styles.cardPhoto, styles.cardVideoBadge]}>
+                  <Ionicons name="videocam" size={20} color={colors.primaryDark} />
+                </View>
+              ) : (
+                <Image source={{ uri: item.mediaUrl }} style={styles.cardPhoto} resizeMode="cover" />
+              ))}
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {item.eventTitle}
@@ -166,6 +173,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cardPhoto: { width: 88, height: 88, backgroundColor: colors.surfaceAlt },
+  cardVideoBadge: { alignItems: "center", justifyContent: "center" },
   cardBody: { flex: 1, padding: spacing.sm, justifyContent: "center" },
   cardTitle: { ...typography.h3, color: colors.textPrimary },
   cardMeta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },

@@ -138,7 +138,12 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
         </View>
       ) : content.type === "event" ? (
         <View style={styles.eventCard}>
-          {content.mediaUrl && <Image source={{ uri: content.mediaUrl }} style={styles.eventPhoto} resizeMode="cover" />}
+          {content.mediaUrl &&
+            (content.eventMediaType === "video" ? (
+              <VideoPost uri={content.mediaUrl} style={styles.eventPhoto} />
+            ) : (
+              <Image source={{ uri: content.mediaUrl }} style={styles.eventPhoto} resizeMode="cover" />
+            ))}
           <View style={styles.eventBody}>
             <Text style={styles.eventTitle}>{content.eventTitle}</Text>
             {content.eventStartsAt && (
@@ -218,11 +223,11 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
   );
 }
 
-function VideoPost({ uri }: { uri: string }) {
+function VideoPost({ uri, style }: { uri: string; style?: object }) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
   });
-  return <VideoView player={player} style={styles.media} nativeControls />;
+  return <VideoView player={player} style={style ?? styles.media} nativeControls />;
 }
 
 const styles = StyleSheet.create({

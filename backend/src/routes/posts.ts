@@ -17,6 +17,7 @@ const createPostBody = z.object({
   eventLocation: z.string().min(1).max(300).optional(),
   eventStartsAt: z.coerce.date().optional(),
   eventCategories: z.array(z.string().min(1).max(30)).max(10).default([]),
+  eventMediaType: z.enum(["image", "video"]).optional(),
 });
 
 const eventsSearchQuery = z.object({
@@ -78,6 +79,9 @@ export async function postRoutes(app: FastifyInstance) {
     } else if (body.type === "event") {
       if (!body.eventTitle || !body.eventLocation) {
         return reply.status(400).send({ error: "eventTitle and eventLocation are required for event posts" });
+      }
+      if (!!body.mediaUrl !== !!body.eventMediaType) {
+        return reply.status(400).send({ error: "mediaUrl and eventMediaType must be given together" });
       }
     }
 

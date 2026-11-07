@@ -118,6 +118,9 @@ export interface Post {
   eventLocation: string | null;
   eventStartsAt: string | null;
   eventCategories: string[];
+  // Which kind of media mediaUrl is, for an event post — "event" itself
+  // doesn't say, unlike a plain "image"/"video" post's own type field.
+  eventMediaType: "image" | "video" | null;
 }
 
 export type ReactionType = "like" | "love" | "haha" | "wow" | "sad" | "angry";

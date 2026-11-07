@@ -40,6 +40,7 @@ export function createPost(input: {
   eventLocation?: string;
   eventStartsAt?: string;
   eventCategories?: string[];
+  eventMediaType?: "image" | "video";
 }) {
   return api.post<Post>("/posts", input);
 }
