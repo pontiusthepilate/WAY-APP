@@ -10,7 +10,7 @@ import { AutoScrollSpotlight } from "../../components/AutoScrollSpotlight";
 import { ShakeTipToast } from "../../components/ShakeTipToast";
 import { LiveRail } from "../../components/LiveRail";
 import { StatusRail } from "../../components/StatusRail";
-import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { OceanWavesBackground } from "../../components/OceanWavesBackground";
 import { useSession } from "../../context/SessionContext";
 import { useAutoScroll } from "../../lib/useAutoScroll";
 import { getDiscoverFeed, getFeed } from "../../api/posts";
@@ -162,7 +162,7 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      <SkyOceanBackground tone="pale" />
+      <OceanWavesBackground source={require("../../../assets/onboarding-waves.mp4")} tone="pale" />
       <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <Text style={styles.headerTitle}>WAY</Text>
         <View style={styles.headerButtons}>
