@@ -1,33 +1,60 @@
 import React, { useEffect, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
-import Svg, { Polyline } from "react-native-svg";
+import Svg, { Circle, Polygon } from "react-native-svg";
 import { colors, spacing, typography } from "../theme/theme";
 import { OceanWavesBackground } from "./OceanWavesBackground";
 
-// A genuine arrow: one continuous stroked path (via react-native-svg),
-// rather than two separately-rotated bars glued together at a seam. A
-// single Polyline with a round line-join gives one real mitered point —
-// no overlap math to tune, no corner-radius gymnastics, no visible seam.
+// A genuine arrow: each leg is a constant-width quad (like a stroke would
+// draw — two parallel edges the whole way down, NOT tapering to a point,
+// which is what read as "a triangle" in an earlier attempt), except its
+// OUTER top corner is stretched further out, along its own edge, until it
+// touches the border line exactly; the inner top corner stays where a
+// plain stroke would naturally put it. A small circle at the shared vertex
+// covers the tiny gap the two legs' own offset corners would otherwise
+// leave there (same thing strokeLinejoin="round" used to do for free).
 const CHEVRON_WIDTH = 38;
 const CHEVRON_HEIGHT = 22;
 const CHEVRON_THICKNESS = 5.5;
 
+function legPolygonPoints(topCenter: { x: number; y: number }, vertex: { x: number; y: number }, lineY: number): string {
+  const dx = vertex.x - topCenter.x;
+  const dy = vertex.y - topCenter.y;
+  const len = Math.hypot(dx, dy);
+  const nx = -dy / len;
+  const ny = dx / len;
+  const half = CHEVRON_THICKNESS / 2;
+  const center = CHEVRON_WIDTH / 2;
+  // Pick which perpendicular direction is "outer" (farther from the
+  // chevron's own horizontal center) vs "inner" — same offset at both the
+  // top and the vertex end keeps the two long edges parallel (constant
+  // width), unlike tapering both edges to a single shared point.
+  const outerSign = Math.abs(topCenter.x + nx * half - center) > Math.abs(topCenter.x - nx * half - center) ? 1 : -1;
+  const outerTop = { x: topCenter.x + outerSign * nx * half, y: topCenter.y + outerSign * ny * half };
+  const innerTop = { x: topCenter.x - outerSign * nx * half, y: topCenter.y - outerSign * ny * half };
+  const outerBottom = { x: vertex.x + outerSign * nx * half, y: vertex.y + outerSign * ny * half };
+  const innerBottom = { x: vertex.x - outerSign * nx * half, y: vertex.y - outerSign * ny * half };
+
+  const edx = outerTop.x - vertex.x;
+  const edy = outerTop.y - vertex.y;
+  const t = (lineY - vertex.y) / edy;
+  const outerExtended = { x: vertex.x + t * edx, y: vertex.y + t * edy };
+
+  return `${outerExtended.x},${outerExtended.y} ${innerTop.x},${innerTop.y} ${innerBottom.x},${innerBottom.y} ${outerBottom.x},${outerBottom.y}`;
+}
+
 function BoldChevron({ direction, color }: { direction: "up" | "down"; color: string }) {
   const inset = CHEVRON_THICKNESS / 2 + 1;
-  const points =
-    direction === "down"
-      ? `${inset},${inset} ${CHEVRON_WIDTH / 2},${CHEVRON_HEIGHT - inset} ${CHEVRON_WIDTH - inset},${inset}`
-      : `${inset},${CHEVRON_HEIGHT - inset} ${CHEVRON_WIDTH / 2},${inset} ${CHEVRON_WIDTH - inset},${CHEVRON_HEIGHT - inset}`;
+  const leftX = inset;
+  const rightX = CHEVRON_WIDTH - inset;
+  const tipY = direction === "down" ? inset : CHEVRON_HEIGHT - inset;
+  const vertexY = direction === "down" ? CHEVRON_HEIGHT - inset : inset;
+  const vertex = { x: CHEVRON_WIDTH / 2, y: vertexY };
+
   return (
     <Svg width={CHEVRON_WIDTH} height={CHEVRON_HEIGHT} viewBox={`0 0 ${CHEVRON_WIDTH} ${CHEVRON_HEIGHT}`}>
-      <Polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={CHEVRON_THICKNESS}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <Polygon points={legPolygonPoints({ x: leftX, y: tipY }, vertex, tipY)} fill={color} />
+      <Polygon points={legPolygonPoints({ x: rightX, y: tipY }, vertex, tipY)} fill={color} />
+      <Circle cx={vertex.x} cy={vertex.y} r={CHEVRON_THICKNESS / 2} fill={color} />
     </Svg>
   );
 }
@@ -231,7 +258,7 @@ const styles = StyleSheet.create({
   // the panel.
   arrowOnBorder: {
     position: "absolute",
-    top: -(ARROW_SIZE / 2) + 6,
+    top: -(ARROW_SIZE / 2) + 12,
     left: "50%",
     marginLeft: -(ARROW_SIZE + 8) / 2,
     width: ARROW_SIZE + 8,
