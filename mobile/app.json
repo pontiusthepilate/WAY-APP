@@ -93,7 +93,8 @@
       "@config-plugins/react-native-webrtc",
       "@config-plugins/react-native-callkeep",
       "./plugins/withCallKeepMicrophone",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "extra": {
       "router": {},
