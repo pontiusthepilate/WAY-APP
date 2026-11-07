@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radii, spacing, typography } from "../theme/theme";
+import { colors, legibleText, radii, spacing, typography } from "../theme/theme";
 import { verifyOtp } from "../api/auth";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
@@ -48,9 +48,9 @@ export default function OtpScreen() {
 
   return (
     <View style={styles.container}>
-      <OceanWavesBackground source={require("../../assets/otp-waves.mp4")} tone="medium" />
+      <OceanWavesBackground source={require("../../assets/ocean-waves-welcome.mp4")} tone="deep" />
       <View style={styles.titleRow}>
-        <Ionicons name="keypad-outline" size={20} color={colors.textPrimary} />
+        <Ionicons name="keypad-outline" size={20} color={colors.textOnPrimary} />
         <Text style={styles.title}>Enter your code</Text>
       </View>
       <Text style={styles.subtitle}>
@@ -96,9 +96,9 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.xl, justifyContent: "center" },
   titleRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: spacing.xs },
-  title: { ...typography.h1, color: colors.textPrimary, textAlign: "center" },
-  subtitle: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xs },
-  devHint: { ...typography.caption, color: colors.horizonDeep, textAlign: "center", marginTop: spacing.md },
+  title: { ...typography.h1, ...legibleText("onDark"), textAlign: "center" },
+  subtitle: { ...typography.body, ...legibleText("onDark"), textAlign: "center", marginTop: spacing.xs },
+  devHint: { ...typography.caption, ...legibleText("onDark"), textAlign: "center", marginTop: spacing.md },
   inputWrap: {
     backgroundColor: colors.surface,
     borderWidth: 1,
