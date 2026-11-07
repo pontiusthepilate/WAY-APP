@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
+import { PageBackground } from "../components/PageBackground";
 import { useSession } from "../context/SessionContext";
 import { getProfileLinks, setProfileLinks } from "../api/profileLinks";
 import { Avatar } from "../components/Avatar";
@@ -51,6 +52,7 @@ export default function ProfileLinksScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackground />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />

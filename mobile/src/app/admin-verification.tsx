@@ -5,6 +5,7 @@ import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
+import { PageBackground } from "../components/PageBackground";
 import {
   listVerificationRequests,
   decideVerificationRequest,
@@ -73,6 +74,7 @@ export default function AdminVerificationScreen() {
   if (!secret) {
     return (
       <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackground />
         <Text style={styles.headerTitle}>Admin access</Text>
         <Text style={styles.label}>Enter the X-Admin-Secret value from backend/.env</Text>
         <TextInput
@@ -93,6 +95,7 @@ export default function AdminVerificationScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackground />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />

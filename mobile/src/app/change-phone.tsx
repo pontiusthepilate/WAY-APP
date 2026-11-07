@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { safeBack } from "../lib/navigation";
+import { PageBackground } from "../components/PageBackground";
 import { requestOtp } from "../api/auth";
 import { changePhone } from "../api/users";
 import { ApiError } from "../api/client";
@@ -53,6 +54,7 @@ export default function ChangePhoneScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackground />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
