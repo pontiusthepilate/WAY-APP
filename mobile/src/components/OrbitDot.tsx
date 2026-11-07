@@ -6,22 +6,10 @@ import { colors, radii } from "../theme/theme";
 // A single point of light traces the entire edge of the screen in a slow,
 // endless lap, pulsing brighter and dimmer as it travels — plus a slim
 // static outline so the edge always reads faintly even between passes.
-// Its color cycles through a fixed 10-color palette once a day (by
+// Its color alternates between white and the WAY brand teal once a day (by
 // calendar day, not by lap), so every app open on the same day shows the
-// same color and it won't repeat for 10 days. Mounted once at the root
-// layout, pointerEvents="none".
-const PALETTE = [
-  colors.horizonDeep, // teal — brand primary accent
-  "#F26A5B", // coral — brand accent (danger)
-  "#F2B705", // amber / gold
-  "#4EA8DE", // sky blue
-  "#9B5DE5", // violet
-  "#F15BB5", // rose / pink
-  "#06D6A0", // seafoam mint
-  "#2B4162", // deep ocean navy
-  "#F3722C", // sunset orange
-  "#B5A8FF", // lavender
-];
+// same color. Mounted once at the root layout, pointerEvents="none".
+const PALETTE = [colors.primary, "#FFFFFF"];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LAP_DURATION_MS = 90000; // slow, ambient drift
