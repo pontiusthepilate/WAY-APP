@@ -1,23 +1,34 @@
 import React, { useEffect, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import Svg, { Polyline } from "react-native-svg";
 import { colors, spacing, typography } from "../theme/theme";
+import { OceanWavesBackground } from "./OceanWavesBackground";
 
-// A custom chevron instead of the Ionicons glyph — Ionicons' stroke weight
-// is fixed regardless of `size`, which read as a thin line awkwardly
-// crossing the panel's border. Two rotated bars meeting at a point give
-// direct control over how thick those "legs" actually are.
-const CHEVRON_LEG_LENGTH = 20;
-const CHEVRON_THICKNESS = 7; // ~3x an Ionicons glyph's own stroke weight at this size
+// A genuine arrow: one continuous stroked path (via react-native-svg),
+// rather than two separately-rotated bars glued together at a seam. A
+// single Polyline with a round line-join gives one real mitered point —
+// no overlap math to tune, no corner-radius gymnastics, no visible seam.
+const CHEVRON_WIDTH = 38;
+const CHEVRON_HEIGHT = 22;
+const CHEVRON_THICKNESS = 5.5;
 
 function BoldChevron({ direction, color }: { direction: "up" | "down"; color: string }) {
-  const leftRotate = direction === "up" ? "45deg" : "-45deg";
-  const rightRotate = direction === "up" ? "-45deg" : "45deg";
-  const leg = { width: CHEVRON_LEG_LENGTH, height: CHEVRON_THICKNESS, borderRadius: CHEVRON_THICKNESS / 2, backgroundColor: color };
+  const inset = CHEVRON_THICKNESS / 2 + 1;
+  const points =
+    direction === "down"
+      ? `${inset},${inset} ${CHEVRON_WIDTH / 2},${CHEVRON_HEIGHT - inset} ${CHEVRON_WIDTH - inset},${inset}`
+      : `${inset},${CHEVRON_HEIGHT - inset} ${CHEVRON_WIDTH / 2},${inset} ${CHEVRON_WIDTH - inset},${CHEVRON_HEIGHT - inset}`;
   return (
-    <View style={styles.chevronWrap}>
-      <View style={[leg, { transform: [{ rotate: leftRotate }], marginRight: -CHEVRON_LEG_LENGTH * 0.3 }]} />
-      <View style={[leg, { transform: [{ rotate: rightRotate }], marginLeft: -CHEVRON_LEG_LENGTH * 0.3 }]} />
-    </View>
+    <Svg width={CHEVRON_WIDTH} height={CHEVRON_HEIGHT} viewBox={`0 0 ${CHEVRON_WIDTH} ${CHEVRON_HEIGHT}`}>
+      <Polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth={CHEVRON_THICKNESS}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
@@ -48,12 +59,13 @@ export interface CollapsibleTabBarProps {
   insets: { bottom: number };
 }
 
-// Each tab bobs and drifts on its own independent loop — different period
-// and phase per icon (derived from its index) so five icons together read
-// as separate buoys riding the same gentle swell, not one rigid shape
-// moving in lockstep. Vertical bob and horizontal drift are driven by two
-// separate Animated.Values per icon (different durations) so the combined
-// path is a loose, organic wander rather than a straight up-down bounce.
+// Each tab bobs and drifts on its own independent loop around its own flex
+// slot — different period and phase per icon (derived from its index) so
+// five icons together read as separate buoys riding the same gentle swell,
+// not one rigid shape moving in lockstep. Vertical bob and horizontal drift
+// are driven by two separate Animated.Values per icon (different durations)
+// so the combined path is a loose, organic wander rather than a straight
+// up-down bounce.
 function useBuoyantFloat(seed: number) {
   const [y] = useState(() => new Animated.Value(0));
   const [x] = useState(() => new Animated.Value(0));
@@ -107,9 +119,10 @@ export function CollapsibleTabBar({ state, descriptors, navigation, insets }: Co
   const tabs = state.routes.map((route, index) => {
     const { options } = descriptors[route.key];
     const isFocused = state.index === index;
-    const color = isFocused
-      ? options.tabBarActiveTintColor ?? colors.primaryDark
-      : options.tabBarInactiveTintColor ?? colors.textSecondary;
+    // Ignores the passed-in tint colors (tuned for a light background) —
+    // the panel is now a "deep" ocean-wave video wash, so labels need the
+    // light-on-dark treatment instead, same as onboarding's own text.
+    const color = isFocused ? colors.textOnPrimary : "rgba(255,255,255,0.68)";
     const label = options.title ?? route.name;
 
     function onPress() {
@@ -130,13 +143,16 @@ export function CollapsibleTabBar({ state, descriptors, navigation, insets }: Co
   if (expanded) {
     return (
       <View style={[styles.panel, { paddingBottom: bottomPadding }]} pointerEvents="box-none">
+        {/* The exact clip onboarding's first 3 screens use, same "deep"
+            wash — the panel reads as an extension of that same ocean. */}
+        <OceanWavesBackground source={require("../../assets/onboarding-waves.mp4")} tone="deep" />
         <Pressable
           style={styles.arrowOnBorder}
           onPress={() => setExpanded(false)}
           hitSlop={16}
           accessibilityLabel="Hide navigation"
         >
-          <BoldChevron direction="down" color={colors.primary} />
+          <BoldChevron direction="down" color={colors.textOnPrimary} />
         </Pressable>
         <View style={styles.row} pointerEvents="box-none">
           {tabs}
@@ -171,19 +187,21 @@ function FloatingTab({ onPress, seed, children }: { onPress: () => void; seed: n
 const ARROW_SIZE = 40;
 
 const styles = StyleSheet.create({
-  chevronWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   container: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center" },
-  // Opaque on purpose — collapsed, the real screen content runs all the way
-  // to the bottom; expanded, this panel's top border is deliberately where
-  // the visible screen now "ends", so it can't be translucent/see-through.
+  // Opaque on purpose (the video fill itself provides that) — collapsed,
+  // the real screen content runs all the way to the bottom; expanded, this
+  // panel is deliberately where the visible screen now "ends". A soft
+  // shadow gives it lift/separation without a hard border line.
   panel: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.background,
-    borderTopWidth: 2,
-    borderTopColor: colors.primary,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 10,
   },
   row: {
     flexDirection: "row",
@@ -213,7 +231,7 @@ const styles = StyleSheet.create({
   // the panel.
   arrowOnBorder: {
     position: "absolute",
-    top: -(ARROW_SIZE / 2),
+    top: -(ARROW_SIZE / 2) + 6,
     left: "50%",
     marginLeft: -(ARROW_SIZE + 8) / 2,
     width: ARROW_SIZE + 8,
