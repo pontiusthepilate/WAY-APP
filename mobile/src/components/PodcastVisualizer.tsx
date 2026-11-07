@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import { colors } from "../theme/theme";
 
@@ -18,7 +18,7 @@ interface Props {
 }
 
 export function PodcastVisualizer({ playing, size, color = colors.primary, children }: Props) {
-  const progressRefs = useRef(Array.from({ length: RING_COUNT }, () => new Animated.Value(0))).current;
+  const [progressRefs] = useState(() => Array.from({ length: RING_COUNT }, () => new Animated.Value(0)));
 
   useEffect(() => {
     if (!playing) {

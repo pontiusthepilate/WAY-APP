@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Easing, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
 import { colors } from "../theme/theme";
 
@@ -22,7 +22,7 @@ interface Props {
 
 export function LocationPulse({ color = colors.primary, maxDiameter, children, style }: Props) {
   const [size, setSize] = useState(0);
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(
