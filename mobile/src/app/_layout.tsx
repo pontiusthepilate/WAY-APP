@@ -13,6 +13,7 @@ import { useCallKeep } from "../lib/callKeep";
 import { WaterRippleOverlay } from "../components/WaterRippleOverlay";
 import { CometTrail } from "../components/CometTrail";
 import { OrbitDot } from "../components/OrbitDot";
+import { EdgeGlow } from "../components/EdgeGlow";
 import { colors } from "../theme/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -86,6 +87,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       </WaterRippleOverlay>
       <OrbitDot />
       <CometTrail />
+      <EdgeGlow />
     </>
   );
 }
