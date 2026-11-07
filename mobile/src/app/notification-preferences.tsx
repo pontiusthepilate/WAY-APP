@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { safeBack } from "../lib/navigation";
+import { PageBackgroundVideo } from "../components/PageBackgroundVideo";
 import { updateNotificationPrefs } from "../api/profiles";
 import type { Profile } from "../types";
 
@@ -42,6 +43,7 @@ export default function NotificationPreferencesScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />

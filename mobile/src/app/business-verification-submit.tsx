@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
+import { PageBackgroundVideo } from "../components/PageBackgroundVideo";
 import { useSession } from "../context/SessionContext";
 import { submitBusinessVerification, COMPANY_TYPES, type CompanyType } from "../api/businessVerification";
 import { uploadMedia } from "../api/uploads";
@@ -66,6 +67,7 @@ export default function BusinessVerificationSubmitScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />

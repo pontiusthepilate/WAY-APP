@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { safeBack } from "../lib/navigation";
+import { PageBackgroundVideo } from "../components/PageBackgroundVideo";
 
 const SUPPORT_EMAIL = "support@wwwaaayyy.com";
 
@@ -16,6 +17,7 @@ export default function AboutScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
+      <PageBackgroundVideo />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
