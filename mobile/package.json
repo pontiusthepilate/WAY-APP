@@ -63,5 +63,8 @@
     "web": "expo start --web",
     "lint": "expo lint"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "mapbox-gl": "^3.34.2"
+  }
 }
