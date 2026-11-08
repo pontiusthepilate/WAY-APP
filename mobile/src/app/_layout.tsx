@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { registerGlobals } from "@livekit/react-native";
+import Mapbox from "@rnmapbox/maps";
 import { useFonts, Gabarito_600SemiBold, Gabarito_700Bold } from "@expo-google-fonts/gabarito";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { usePushRegistration } from "../lib/usePushRegistration";
@@ -15,9 +16,14 @@ import { CometTrail } from "../components/CometTrail";
 import { OrbitDot } from "../components/OrbitDot";
 import { EdgeGlow } from "../components/EdgeGlow";
 import { colors } from "../theme/theme";
+import { MAPBOX_TOKEN } from "../api/config";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 registerGlobals();
+// Same public token search.ts's live suggestions already call Mapbox with
+// directly — the map picker (search.tsx) needs the native SDK to have it
+// too, set once here rather than per-screen.
+if (MAPBOX_TOKEN) Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {

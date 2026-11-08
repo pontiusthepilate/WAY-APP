@@ -80,3 +80,27 @@ export async function retrievePlace(
   const label = feature.properties.full_address ?? feature.properties.name ?? "";
   return { lat, lng, label };
 }
+
+// Point → label, for the map picker (Phase 4): turns a dropped-pin
+// coordinate into readable text the same way a typed suggestion resolves to
+// one, using the same v6 Geocoding endpoint the backend's geocodeAddress
+// uses in the other direction. Called directly from the client, like the
+// suggest/retrieve pair above — no backend round-trip needed.
+export async function reverseGeocode(
+  point: { lat: number; lng: number },
+  opts: { language?: string }
+): Promise<string | null> {
+  if (!MAPBOX_TOKEN) return null;
+  const url = `https://api.mapbox.com/search/geocode/v6/reverse${qs({
+    longitude: point.lng,
+    latitude: point.lat,
+    access_token: MAPBOX_TOKEN,
+    language: opts.language,
+  })}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = (await res.json()) as RetrieveResponse;
+  const feature = data.features[0];
+  if (!feature) return null;
+  return feature.properties.full_address ?? feature.properties.name ?? null;
+}

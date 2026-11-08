@@ -32,6 +32,7 @@ import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
 import { searchAddress, searchAll, searchByWayId, searchLocation, searchNearby } from "../../api/search";
 import { newSessionToken, retrievePlace, suggestPlaces, type PlaceSuggestion } from "../../api/mapbox";
 import { PlaceSuggestions } from "../../components/PlaceSuggestions";
+import { MapPickerModal } from "../../components/MapPickerModal";
 import { useDebouncedValue } from "../../lib/useDebounce";
 import { useSearchLanguage } from "../../lib/useLocale";
 import { startConversation } from "../../api/messages";
@@ -83,6 +84,10 @@ export default function SearchScreen() {
   const locationSessionRef = useRef(newSessionToken());
   const debouncedAddressText = useDebouncedValue(addressText, 300);
   const debouncedLocationText = useDebouncedValue(locationText, 300);
+  // Which field a drop-a-pin session is filling in — null means the picker
+  // is closed. Doubles as the open flag so there's one source of truth for
+  // which TextInput the resolved pin should land in.
+  const [mapPickerMode, setMapPickerMode] = useState<"address" | "location" | null>(null);
 
   const [results, setResults] = useState<NearbyResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -323,6 +328,34 @@ export default function SearchScreen() {
     }
   }
 
+  // Confirms a dropped pin from MapPickerModal into whichever field opened
+  // it — same "we already have a resolved point, search on it directly"
+  // shape as selectAddressSuggestion/selectLocationSuggestion above.
+  async function pickOnMap(point: { lat: number; lng: number; label: string }) {
+    const target = mapPickerMode;
+    setMapPickerMode(null);
+    if (!activeProfile || !target) return;
+    setLoading(true);
+    setError(null);
+    try {
+      if (target === "address") {
+        setAddressText(point.label);
+        setAddressCoords({ lat: point.lat, lng: point.lng });
+        const next = await searchAddress({ profileId: activeProfile.id, lat: point.lat, lng: point.lng, radiusMeters, category: category || undefined, language });
+        setResults(next);
+      } else {
+        setLocationText(point.label);
+        setLocationCoords({ lat: point.lat, lng: point.lng });
+        const next = await searchLocation({ profileId: activeProfile.id, lat: point.lat, lng: point.lng, radiusMeters, category: category || undefined, language });
+        setResults(next);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function toggleVisibility(next: boolean) {
     if (!activeProfile) return;
     await updateVisibility(activeProfile.id, { isVisible: next });
@@ -398,6 +431,9 @@ export default function SearchScreen() {
                 }}
                 onSubmitEditing={runSearch}
               />
+              <Pressable onPress={() => setMapPickerMode("address")} hitSlop={8} accessibilityLabel="Pick on map">
+                <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
+              </Pressable>
             </View>
             <PlaceSuggestions
               suggestions={addressSuggestions}
@@ -421,6 +457,9 @@ export default function SearchScreen() {
                 }}
                 onSubmitEditing={runSearch}
               />
+              <Pressable onPress={() => setMapPickerMode("location")} hitSlop={8} accessibilityLabel="Pick on map">
+                <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
+              </Pressable>
             </View>
             <PlaceSuggestions
               suggestions={locationSuggestions}
@@ -599,6 +638,14 @@ export default function SearchScreen() {
         onRequestCamera={openCameraRequest}
         onMessage={openMessage}
         onOpenProfile={setSelected}
+      />
+
+      <MapPickerModal
+        open={mapPickerMode !== null}
+        initialCenter={coords}
+        language={language}
+        onClose={() => setMapPickerMode(null)}
+        onConfirm={pickOnMap}
       />
     </View>
   );

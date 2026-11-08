@@ -94,7 +94,8 @@
       "@config-plugins/react-native-callkeep",
       "./plugins/withCallKeepMicrophone",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      "@rnmapbox/maps"
     ],
     "extra": {
       "router": {},
