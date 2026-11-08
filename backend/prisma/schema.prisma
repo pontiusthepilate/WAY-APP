@@ -588,6 +588,25 @@ model Notification {
   @@index([profileId, read])
 }
 
+// A user-submitted "this should be a category" suggestion, surfaced to the
+// admin inbox (see requireAdminSecret's note: no admin role system yet,
+// just the one owner reviewing via GET/POST /admin/category-suggestions,
+// same lazy curl/Postman-driven pattern as business verification). Approving
+// one doesn't auto-add it anywhere — the fixed category list mobile ships
+// (mobile/src/lib/interests.ts) is static, so "implementing" an approved
+// suggestion today means a developer adds it there and ships an update;
+// this table is the intake queue, not a live-editable category store.
+model CategorySuggestion {
+  id            String    @id @default(cuid())
+  text          String
+  suggestedById String
+  status        String    @default("pending") // "pending" | "approved" | "rejected"
+  createdAt     DateTime  @default(now())
+  decidedAt     DateTime?
+
+  @@index([status, createdAt])
+}
+
 // A voice/video call hanging off an existing DM Conversation — calls are
 // always between the two people already in that thread. roomName is the
 // LiveKit room id (derived from this row's own id, see routes/calls.ts),

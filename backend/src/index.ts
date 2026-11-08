@@ -27,6 +27,7 @@ import { callRoutes } from "./routes/calls";
 import { businessVerificationRoutes } from "./routes/businessVerification";
 import { subscriptionRoutes } from "./routes/subscriptions";
 import { episodeRoutes } from "./routes/episodes";
+import { categorySuggestionRoutes } from "./routes/categorySuggestions";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -113,6 +114,7 @@ async function main() {
   await app.register(businessVerificationRoutes);
   await app.register(subscriptionRoutes);
   await app.register(episodeRoutes);
+  await app.register(categorySuggestionRoutes);
 
   // Reached only when no API route or static file matched — i.e. a browser
   // navigating straight to (or reloading) a client-side route like /feed.
