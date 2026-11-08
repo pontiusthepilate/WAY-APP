@@ -26,6 +26,7 @@ import { EventSearchPanel } from "../../components/EventSearchPanel";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { DotOutline } from "../../components/DotOutline";
 import { CountryCodeDivider, CountryCodeTrigger, CountryPickerSheet } from "../../components/CountryCodePicker";
+import { CategoryPickerSheet, CategoryTrigger } from "../../components/CategoryPicker";
 import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
 import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
@@ -67,6 +68,7 @@ export default function SearchScreen() {
   const [wayIdText, setWayIdText] = useState("");
   const [wayIdCountry, setWayIdCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [allQueryText, setAllQueryText] = useState("");
   const [unifiedResults, setUnifiedResults] = useState<UnifiedSearchResults | null>(null);
   const language = useSearchLanguage();
@@ -514,16 +516,20 @@ export default function SearchScreen() {
         )}
 
         {mode !== "wayid" && mode !== "all" && (
-          <View style={styles.inputWrap}>
-            <Ionicons name="pricetag-outline" size={18} color={colors.textSecondary} />
-            <TextInput
-              style={styles.input}
-              placeholder="Category / interest (optional)"
-              placeholderTextColor={colors.textSecondary}
-              value={category}
-              onChangeText={setCategory}
+          <>
+            <View style={styles.inputWrap}>
+              <Ionicons name="pricetag-outline" size={18} color={colors.textSecondary} />
+              <CategoryTrigger value={category} onPress={() => setCategoryPickerOpen(true)} />
+            </View>
+            <CategoryPickerSheet
+              open={categoryPickerOpen}
+              onClose={() => setCategoryPickerOpen(false)}
+              onSelect={(name) => {
+                setCategory(name);
+                setCategoryPickerOpen(false);
+              }}
             />
-          </View>
+          </>
         )}
 
         {mode !== "wayid" && mode !== "all" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
