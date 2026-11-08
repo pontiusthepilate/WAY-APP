@@ -8,6 +8,7 @@ export interface Profile {
   categories: string[];
   kind: "personal" | "business" | "podcast";
   isVerified: boolean;
+  isPrimary: boolean;
   followersCount: number;
   followingCount: number;
   isVisible: boolean;

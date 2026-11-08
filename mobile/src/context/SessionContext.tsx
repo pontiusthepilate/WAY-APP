@@ -16,6 +16,13 @@ interface SessionState {
 
 const SessionContext = createContext<SessionState | undefined>(undefined);
 
+// The backend already orders primary-first, so list[0] is normally correct
+// on its own — this is just a belt-and-suspenders explicit check against
+// that ordering assumption drifting later.
+function defaultProfileId(list: Profile[]): string | null {
+  return list.find((p) => p.isPrimary)?.id ?? list[0]?.id ?? null;
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -29,7 +36,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         try {
           const fetched = await myProfiles();
           setProfiles(fetched);
-          setActiveProfileId(fetched[0]?.id ?? null);
+          setActiveProfileId(defaultProfileId(fetched));
           setIsSignedIn(true);
         } catch {
           await persistToken(null);
@@ -42,12 +49,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const refreshProfiles = useCallback(async () => {
     const fetched = await myProfiles();
     setProfiles(fetched);
-    setActiveProfileId((current) => current ?? fetched[0]?.id ?? null);
+    setActiveProfileId((current) => current ?? defaultProfileId(fetched));
   }, []);
 
   const onSignedIn = useCallback((newProfiles: Profile[]) => {
     setProfiles(newProfiles);
-    setActiveProfileId(newProfiles[0]?.id ?? null);
+    setActiveProfileId(defaultProfileId(newProfiles));
     setIsSignedIn(true);
   }, []);
 

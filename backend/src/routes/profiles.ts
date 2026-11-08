@@ -65,7 +65,7 @@ const locationBody = z.object({
 export async function profileRoutes(app: FastifyInstance) {
   app.get("/profiles/me", { onRequest: [app.authenticate] }, async (req) => {
     const { userId } = requireUser(req);
-    return prisma.profile.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
+    return prisma.profile.findMany({ where: { userId }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] });
   });
 
   app.post("/profiles", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -104,10 +104,29 @@ export async function profileRoutes(app: FastifyInstance) {
       return reply.status(409).send({ error: "That WAY is already taken" });
     }
 
+    // This user's very first profile is their primary by default — nothing
+    // to choose between yet. Later profiles stay non-primary until the user
+    // explicitly switches via PATCH /profiles/:id/primary.
+    const existingCount = await prisma.profile.count({ where: { userId } });
     const profile = await prisma.profile.create({
-      data: { ...body, wayId, userId },
+      data: { ...body, wayId, userId, isPrimary: existingCount === 0 },
     });
     reply.status(201).send(profile);
+  });
+
+  // Sets this profile as the user's default "what's your WAY" answer,
+  // unsetting any previous primary — exactly one per user, enforced here
+  // rather than as a DB constraint since Postgres can't express "unique
+  // where true" without a partial index this schema doesn't have.
+  app.patch("/profiles/:id/primary", { onRequest: [app.authenticate] }, async (req) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    await assertOwnsProfile(userId, id);
+
+    return prisma.$transaction(async (tx) => {
+      await tx.profile.updateMany({ where: { userId, isPrimary: true }, data: { isPrimary: false } });
+      return tx.profile.update({ where: { id }, data: { isPrimary: true } });
+    });
   });
 
   app.get("/profiles/way/:wayId", async (req, reply) => {

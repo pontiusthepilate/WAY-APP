@@ -71,6 +71,12 @@ model Profile {
   categories  String[] @default([]) // interests / category tags used for search filtering
   kind        String   @default("personal") // free-form label, e.g. "personal" | "business"
   isVerified  Boolean  @default(false)
+  // The default answer to "what's your WAY" when a user has more than one
+  // profile — exactly one true per user, enforced in application code (see
+  // PATCH /profiles/:id/primary), not a DB constraint. The wayId model
+  // itself stays flat/global (see project memory on username structure);
+  // this is just a default-selection flag layered on top of it.
+  isPrimary   Boolean  @default(false)
 
   followersCount Int @default(0)
   followingCount Int @default(0)

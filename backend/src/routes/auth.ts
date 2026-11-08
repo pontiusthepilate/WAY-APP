@@ -71,7 +71,10 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
 
-    const profiles = await prisma.profile.findMany({ where: { userId: user.id } });
+    const profiles = await prisma.profile.findMany({
+      where: { userId: user.id },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    });
     const token = await reply.jwtSign({ userId: user.id }, { expiresIn: "30d" });
 
     reply.send({

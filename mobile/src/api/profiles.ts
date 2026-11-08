@@ -19,6 +19,10 @@ export function updateProfile(id: string, input: Partial<Pick<Profile, "displayN
   return api.patch<Profile>(`/profiles/${id}`, input);
 }
 
+export function setPrimaryProfile(id: string) {
+  return api.patch<Profile>(`/profiles/${id}/primary`, {});
+}
+
 export function updateVisibility(
   id: string,
   input: Partial<

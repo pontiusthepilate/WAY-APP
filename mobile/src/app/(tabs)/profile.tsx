@@ -12,7 +12,7 @@ import { getProfileEpisodes } from "../../api/episodes";
 import { getScheduledLiveSessions, startLiveSession } from "../../api/live";
 import { getIncomingCameraRequests } from "../../api/remoteCamera";
 import { getIncomingWayRequests } from "../../api/wayRequests";
-import { updateProfile } from "../../api/profiles";
+import { setPrimaryProfile, updateProfile } from "../../api/profiles";
 import { uploadMedia } from "../../api/uploads";
 import { getActiveStatusIds } from "../../api/status";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
@@ -178,27 +178,39 @@ export default function ProfileScreen() {
           </View>
 
           {profiles.length > 1 && (
-            <View style={styles.switcherRow}>
-              {profiles.map((p) => (
-                <Pressable
-                  key={p.id}
-                  style={[styles.switcherChip, p.id === activeProfile.id && styles.switcherChipActive]}
-                  onPress={() => setActiveProfileId(p.id)}
-                >
-                  {KIND_ICON[p.kind] && (
-                    <Ionicons
-                      name={KIND_ICON[p.kind]}
-                      size={12}
-                      color={p.id === activeProfile.id ? colors.textOnPrimary : colors.textSecondary}
-                      style={styles.switcherIcon}
-                    />
-                  )}
-                  <Text style={[styles.switcherLabel, p.id === activeProfile.id && styles.switcherLabelActive]}>
-                    WAY/{p.wayId}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <>
+              <View style={styles.switcherRow}>
+                {profiles.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    style={[styles.switcherChip, p.id === activeProfile.id && styles.switcherChipActive]}
+                    onPress={() => setActiveProfileId(p.id)}
+                    onLongPress={() => setPrimaryProfile(p.id).then(refreshProfiles).catch(() => {})}
+                  >
+                    {p.isPrimary && (
+                      <Ionicons
+                        name="star"
+                        size={12}
+                        color={p.id === activeProfile.id ? colors.textOnPrimary : colors.warning}
+                        style={styles.switcherIcon}
+                      />
+                    )}
+                    {KIND_ICON[p.kind] && (
+                      <Ionicons
+                        name={KIND_ICON[p.kind]}
+                        size={12}
+                        color={p.id === activeProfile.id ? colors.textOnPrimary : colors.textSecondary}
+                        style={styles.switcherIcon}
+                      />
+                    )}
+                    <Text style={[styles.switcherLabel, p.id === activeProfile.id && styles.switcherLabelActive]}>
+                      WAY/{p.wayId}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.switcherHint}>Long-press a WAY to make it your default</Text>
+            </>
           )}
 
           {scheduled.length > 0 && (
@@ -380,6 +392,13 @@ const styles = StyleSheet.create({
   switcherIcon: { marginRight: 4 },
   switcherLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "600" },
   switcherLabelActive: { color: colors.textOnPrimary },
+  switcherHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
+  },
   upcomingSection: { marginTop: spacing.lg, paddingHorizontal: spacing.lg },
   sectionTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs },
   upcomingRow: {
