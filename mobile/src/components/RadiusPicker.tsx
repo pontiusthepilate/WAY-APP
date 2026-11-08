@@ -5,7 +5,10 @@ import { colors, radii, spacing, typography } from "../theme/theme";
 
 type RadiusUnit = "m" | "km" | "mi" | "ft";
 
-const UNITS: RadiusUnit[] = ["m", "km", "mi", "ft"];
+// Ordered by magnitude (1 ft < 1 m < 1 km < 1 mi), not by how common each
+// unit is — the default selection is still "m" (see useState below), this
+// only controls the chips' left-to-right order.
+const UNITS: RadiusUnit[] = ["ft", "m", "km", "mi"];
 const UNIT_LABELS: Record<RadiusUnit, string> = { m: "m", km: "km", mi: "mi", ft: "ft" };
 
 // Meters-per-unit, so every value below can be stored/sent as meters (the
