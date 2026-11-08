@@ -20,6 +20,17 @@ const MESSAGE_BY_TYPE: Record<NotificationType, (name: string) => string> = {
   go_live: (name) => `${name} is live now`,
 };
 
+// like/comment target either a Post or an Episode (disambiguated by which
+// id is present, same as the tap-navigation below) — every other type is
+// never about a specific piece of content, so the plain map covers it.
+function formatNotificationMessage(item: AppNotification): string {
+  const name = item.actor?.displayName ?? "Someone";
+  if (item.episodeId && (item.type === "like" || item.type === "comment")) {
+    return item.type === "like" ? `${name} liked your episode` : `${name} commented on your episode`;
+  }
+  return MESSAGE_BY_TYPE[item.type](name);
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -48,7 +59,8 @@ export default function NotificationsScreen() {
       setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n)));
       markNotificationRead(notification.id, activeProfile.id).catch(() => {});
     }
-    if (notification.postId) router.push(`/post/${notification.postId}`);
+    if (notification.episodeId) router.push(`/episode/${notification.episodeId}`);
+    else if (notification.postId) router.push(`/post/${notification.postId}`);
   }
 
   async function handleMarkAllRead() {
@@ -84,7 +96,7 @@ export default function NotificationsScreen() {
               </View>
             )}
             <View style={styles.rowText}>
-              <Text style={styles.message}>{MESSAGE_BY_TYPE[item.type](item.actor?.displayName ?? "Someone")}</Text>
+              <Text style={styles.message}>{formatNotificationMessage(item)}</Text>
               <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
             </View>
             {!item.read && <View style={styles.unreadDot} />}

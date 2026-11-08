@@ -161,6 +161,19 @@ export interface Episode {
   mediaUrl: string;
   coverImageUrl: string | null;
   playsCount: number;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  viewerLiked: boolean;
+  createdAt: string;
+}
+
+export interface EpisodeComment {
+  id: string;
+  episodeId: string;
+  profileId: string;
+  profile: ProfileSummary | null;
+  text: string;
   createdAt: string;
 }
 
@@ -295,6 +308,7 @@ export interface AppNotification {
   actorProfileId: string | null;
   actor: ProfileSummary | null;
   postId: string | null;
+  episodeId: string | null;
   read: boolean;
   createdAt: string;
 }

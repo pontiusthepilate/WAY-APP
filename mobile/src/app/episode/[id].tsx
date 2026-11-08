@@ -1,5 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -11,12 +21,15 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import type { useAudioPlayer as UseAudioPlayerType, useAudioPlayerStatus as UseAudioPlayerStatusType } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
-import { getEpisode, registerPlay } from "../../api/episodes";
+import { addEpisodeComment, getEpisode, getEpisodeComments, registerPlay } from "../../api/episodes";
 import { safeBack } from "../../lib/navigation";
 import { Avatar } from "../../components/Avatar";
 import { PodcastVisualizer } from "../../components/PodcastVisualizer";
 import { PageBackground } from "../../components/PageBackground";
-import type { Episode } from "../../types";
+import { EpisodeActionRow } from "../../components/EpisodeActionRow";
+import { useSession } from "../../context/SessionContext";
+import { formatRelativeTime } from "../../lib/formatRelativeTime";
+import type { Episode, EpisodeComment } from "../../types";
 
 const COVER_SIZE = 220;
 
@@ -31,15 +44,26 @@ export default function EpisodeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { activeProfile } = useSession();
   const [episode, setEpisode] = useState<Episode | null>(null);
+  const [comments, setComments] = useState<EpisodeComment[]>([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const playedRef = useRef(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!id) return;
-    getEpisode(id)
-      .then(setEpisode)
+    Promise.all([getEpisode(id, activeProfile?.id), getEpisodeComments(id)])
+      .then(([episodeResult, commentsResult]) => {
+        setEpisode(episodeResult);
+        setComments(commentsResult);
+      })
       .catch(() => safeBack());
-  }, [id]);
+  }, [id, activeProfile?.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     if (!id || playedRef.current) return;
@@ -47,10 +71,27 @@ export default function EpisodeScreen() {
     registerPlay(id).catch(() => {});
   }, [id]);
 
+  async function handleSend() {
+    if (!activeProfile || !id || !draft.trim()) return;
+    setSending(true);
+    try {
+      const comment = await addEpisodeComment(id, { profileId: activeProfile.id, text: draft.trim() });
+      setComments((prev) => [...prev, comment]);
+      setDraft("");
+      setEpisode((prev) => (prev ? { ...prev, commentsCount: prev.commentsCount + 1 } : prev));
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (!episode) return null;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={90}
+    >
       <PageBackground />
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={12}>
@@ -60,18 +101,55 @@ export default function EpisodeScreen() {
         <View style={{ width: 26 }} />
       </View>
 
-      <Pressable style={styles.authorRow} onPress={() => router.push(`/profile`)} hitSlop={6}>
-        <Avatar uri={episode.profile.displayPictureUrl} displayName={episode.profile.displayName} size={32} />
-        <Text style={styles.authorName}>{episode.profile.displayName}</Text>
-        <Text style={styles.authorWay}>WAY/{episode.profile.wayId}</Text>
-      </Pressable>
+      <FlatList
+        data={comments}
+        keyExtractor={(c) => c.id}
+        contentContainerStyle={styles.listPadding}
+        ListHeaderComponent={
+          <>
+            <Pressable style={styles.authorRow} onPress={() => router.push(`/profile`)} hitSlop={6}>
+              <Avatar uri={episode.profile.displayPictureUrl} displayName={episode.profile.displayName} size={32} />
+              <Text style={styles.authorName}>{episode.profile.displayName}</Text>
+              <Text style={styles.authorWay}>WAY/{episode.profile.wayId}</Text>
+            </Pressable>
 
-      {episode.type === "video" ? (
-        <VideoEpisode mediaUrl={episode.mediaUrl} title={episode.title} playsCount={episode.playsCount} />
-      ) : (
-        <AudioEpisode episode={episode} />
-      )}
-    </View>
+            {episode.type === "video" ? (
+              <VideoEpisode mediaUrl={episode.mediaUrl} title={episode.title} playsCount={episode.playsCount} />
+            ) : (
+              <AudioEpisode episode={episode} />
+            )}
+
+            <View style={styles.actionRowWrap}>
+              <EpisodeActionRow episode={episode} onChange={setEpisode} />
+            </View>
+          </>
+        }
+        renderItem={({ item }) => (
+          <View style={styles.commentRow}>
+            <Text style={styles.commentAuthor}>{item.profile?.displayName ?? "Someone"}</Text>
+            <Text style={styles.commentText}>{item.text}</Text>
+            <Text style={styles.commentTime}>{formatRelativeTime(item.createdAt)}</Text>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.empty}>No comments yet.</Text>}
+      />
+
+      <View style={styles.composerRow}>
+        <View style={styles.inputWrap}>
+          <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Add a comment…"
+            placeholderTextColor={colors.textSecondary}
+            value={draft}
+            onChangeText={setDraft}
+          />
+        </View>
+        <Pressable style={styles.sendButton} onPress={handleSend} disabled={sending || !draft.trim()}>
+          <Ionicons name="paper-plane-outline" size={16} color={colors.textOnPrimary} />
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -141,7 +219,49 @@ const styles = StyleSheet.create({
   authorWay: { ...typography.caption, color: colors.textSecondary },
   videoWrap: { paddingHorizontal: spacing.lg, alignItems: "center" },
   video: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000", borderRadius: radii.md },
-  audioWrap: { flex: 1, alignItems: "center", paddingTop: spacing.xl },
+  audioWrap: { alignItems: "center", paddingTop: spacing.xl },
+  actionRowWrap: { alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.md },
+  listPadding: { paddingBottom: spacing.xl },
+  commentRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  commentAuthor: { ...typography.caption, color: colors.textSecondary, fontWeight: "700" },
+  commentText: { ...typography.body, color: colors.textPrimary, marginTop: 2 },
+  commentTime: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", padding: spacing.lg },
+  composerRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  inputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: "rgba(16, 42, 49, 0.08)",
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+  },
+  inputIcon: { marginRight: spacing.xs },
+  input: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  sendButton: {
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
+    borderRadius: radii.pill,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cover: { width: COVER_SIZE, height: COVER_SIZE, borderRadius: radii.lg, backgroundColor: colors.surfaceAlt },
   coverPlaceholder: { alignItems: "center", justifyContent: "center" },
   title: { ...typography.h3, color: colors.textPrimary, textAlign: "center", marginTop: spacing.lg, paddingHorizontal: spacing.lg },

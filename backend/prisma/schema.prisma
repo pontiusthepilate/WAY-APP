@@ -166,10 +166,48 @@ model Episode {
   // plays; unused for video episodes (the video frame is the art).
   coverImageUrl String?
   playsCount    Int      @default(0)
+  likesCount    Int      @default(0)
+  commentsCount Int      @default(0)
+  sharesCount   Int      @default(0)
   createdAt     DateTime @default(now())
+
+  likes    EpisodeLike[]
+  comments EpisodeComment[]
 
   @@index([profileId, createdAt])
   @@index([createdAt])
+}
+
+// Mirrors Like, but kept as its own model rather than making Like
+// polymorphic — Episode was already deliberately kept separate from Post
+// at the schema level (see above), and splitting Like's
+// @@unique([postId, profileId]) into two nullable-FK variants would be
+// real churn on a table Post's whole reaction system depends on, for no
+// benefit over a straight parallel copy. No `type` field here (unlike
+// Like's 6 reaction variants) — this is a plain like/unlike toggle.
+model EpisodeLike {
+  id        String   @id @default(cuid())
+  episodeId String
+  profileId String
+  createdAt DateTime @default(now())
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([episodeId, profileId])
+  @@index([profileId])
+}
+
+// Mirrors Comment, same reasoning as EpisodeLike above.
+model EpisodeComment {
+  id        String   @id @default(cuid())
+  episodeId String
+  profileId String
+  text      String
+  createdAt DateTime @default(now())
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([episodeId, createdAt])
 }
 
 // A cross-link from one of a user's own profiles to another, shown to
@@ -542,6 +580,7 @@ model Notification {
   type           String // "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live"
   actorProfileId String?
   postId         String?
+  episodeId      String?
   read           Boolean  @default(false)
   createdAt      DateTime @default(now())
 

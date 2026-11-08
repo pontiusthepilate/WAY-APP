@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Episode, EpisodeType } from "../types";
+import type { Episode, EpisodeComment, EpisodeType } from "../types";
 
 interface EpisodePage {
   episodes: Episode[];
@@ -23,16 +23,19 @@ export function createEpisode(input: {
   return api.post<Episode>("/episodes", input);
 }
 
-export function getEpisodesFeed(input: { cursor?: string; limit?: number } = {}) {
+export function getEpisodesFeed(input: { cursor?: string; limit?: number; viewerProfileId?: string } = {}) {
   return api.get<EpisodePage>(`/episodes/feed${qs(input)}`);
 }
 
-export function getProfileEpisodes(profileId: string, input: { cursor?: string; limit?: number } = {}) {
+export function getProfileEpisodes(
+  profileId: string,
+  input: { cursor?: string; limit?: number; viewerProfileId?: string } = {}
+) {
   return api.get<EpisodePage>(`/profiles/${profileId}/episodes${qs(input)}`);
 }
 
-export function getEpisode(id: string) {
-  return api.get<Episode>(`/episodes/${id}`);
+export function getEpisode(id: string, viewerProfileId?: string) {
+  return api.get<Episode>(`/episodes/${id}${qs({ viewerProfileId })}`);
 }
 
 export function registerPlay(id: string) {
@@ -41,4 +44,20 @@ export function registerPlay(id: string) {
 
 export function deleteEpisode(id: string) {
   return api.del(`/episodes/${id}`);
+}
+
+export function toggleEpisodeLike(episodeId: string, profileId: string) {
+  return api.post<{ liked: boolean; likesCount: number }>(`/episodes/${episodeId}/like`, { profileId });
+}
+
+export function getEpisodeComments(episodeId: string, cursor?: string) {
+  return api.get<EpisodeComment[]>(`/episodes/${episodeId}/comments${qs({ cursor })}`);
+}
+
+export function addEpisodeComment(episodeId: string, input: { profileId: string; text: string }) {
+  return api.post<EpisodeComment>(`/episodes/${episodeId}/comments`, input);
+}
+
+export function registerEpisodeShare(episodeId: string) {
+  return api.post<{ sharesCount: number }>(`/episodes/${episodeId}/share`);
 }

@@ -6,6 +6,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { PostGridItem } from "../../components/PostGridItem";
+import { EpisodeActionRow } from "../../components/EpisodeActionRow";
 import { useSession } from "../../context/SessionContext";
 import { getProfilePosts } from "../../api/posts";
 import { getProfileEpisodes } from "../../api/episodes";
@@ -52,7 +53,10 @@ export default function ProfileScreen() {
         getIncomingWayRequests(activeProfile.id).catch(() => []),
         getActiveStatusIds([activeProfile.id]).catch((): string[] => []),
         activeProfile.kind === "podcast"
-          ? getProfileEpisodes(activeProfile.id, { limit: 20 }).catch(() => ({ episodes: [], nextCursor: null }))
+          ? getProfileEpisodes(activeProfile.id, { limit: 20, viewerProfileId: activeProfile.id }).catch(() => ({
+              episodes: [],
+              nextCursor: null,
+            }))
           : Promise.resolve({ episodes: [], nextCursor: null }),
       ]);
       setPosts(page.posts);
@@ -286,15 +290,22 @@ export default function ProfileScreen() {
             <View style={styles.upcomingSection}>
               <Text style={styles.sectionTitle}>Episodes</Text>
               {episodes.map((ep) => (
-                <Pressable key={ep.id} style={styles.upcomingRow} onPress={() => router.push(`/episode/${ep.id}`)}>
-                  <View style={styles.upcomingInfo}>
-                    <Text style={styles.upcomingTitle}>{ep.title}</Text>
-                    <Text style={styles.upcomingTime}>
-                      {ep.type === "audio" ? "Audio" : "Video"} · {ep.playsCount} plays
-                    </Text>
-                  </View>
-                  <Ionicons name={ep.type === "audio" ? "play-circle-outline" : "videocam-outline"} size={22} color={colors.primary} />
-                </Pressable>
+                <View key={ep.id} style={styles.episodeCard}>
+                  <Pressable style={styles.episodeCardMain} onPress={() => router.push(`/episode/${ep.id}`)}>
+                    <View style={styles.upcomingInfo}>
+                      <Text style={styles.upcomingTitle}>{ep.title}</Text>
+                      <Text style={styles.upcomingTime}>
+                        {ep.type === "audio" ? "Audio" : "Video"} · {ep.playsCount} plays
+                      </Text>
+                    </View>
+                    <Ionicons name={ep.type === "audio" ? "play-circle-outline" : "videocam-outline"} size={22} color={colors.primary} />
+                  </Pressable>
+                  <EpisodeActionRow
+                    episode={ep}
+                    onChange={(updated) => setEpisodes((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))}
+                    onOpenComments={() => router.push(`/episode/${ep.id}`)}
+                  />
+                </View>
               ))}
             </View>
           )}
@@ -424,6 +435,8 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     marginBottom: spacing.xs,
   },
+  episodeCard: { backgroundColor: colors.surfaceAlt, borderRadius: radii.md, padding: spacing.sm, marginBottom: spacing.xs },
+  episodeCardMain: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm },
   upcomingInfo: { flex: 1, marginRight: spacing.sm },
   upcomingTitle: { ...typography.body, color: colors.textPrimary, fontWeight: "600" },
   upcomingTime: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
