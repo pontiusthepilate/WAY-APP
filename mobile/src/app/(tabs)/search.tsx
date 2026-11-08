@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -30,6 +30,10 @@ import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
 import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
 import { searchAddress, searchAll, searchByWayId, searchLocation, searchNearby } from "../../api/search";
+import { newSessionToken, retrievePlace, suggestPlaces, type PlaceSuggestion } from "../../api/mapbox";
+import { PlaceSuggestions } from "../../components/PlaceSuggestions";
+import { useDebouncedValue } from "../../lib/useDebounce";
+import { useSearchLanguage } from "../../lib/useLocale";
 import { startConversation } from "../../api/messages";
 import { updateVisibility } from "../../api/profiles";
 import { getActiveStatusIds } from "../../api/status";
@@ -64,6 +68,21 @@ export default function SearchScreen() {
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [allQueryText, setAllQueryText] = useState("");
   const [unifiedResults, setUnifiedResults] = useState<UnifiedSearchResults | null>(null);
+  const language = useSearchLanguage();
+
+  // Resolved coordinates from a tapped Mapbox suggestion — cleared whenever
+  // the field's text is hand-edited, so runSearch knows whether to reuse
+  // this point directly or fall back to a fresh free-text geocode.
+  const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [addressSuggestions, setAddressSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
+  const [locationSuggestLoading, setLocationSuggestLoading] = useState(false);
+  const addressSessionRef = useRef(newSessionToken());
+  const locationSessionRef = useRef(newSessionToken());
+  const debouncedAddressText = useDebouncedValue(addressText, 300);
+  const debouncedLocationText = useDebouncedValue(locationText, 300);
 
   const [results, setResults] = useState<NearbyResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,6 +123,48 @@ export default function SearchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  useEffect(() => {
+    const text = debouncedAddressText.trim();
+    if (text.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAddressSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    setAddressSuggestLoading(true);
+    suggestPlaces(text, { sessionToken: addressSessionRef.current, language })
+      .then((results) => {
+        if (!cancelled) setAddressSuggestions(results);
+      })
+      .finally(() => {
+        if (!cancelled) setAddressSuggestLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedAddressText, language]);
+
+  useEffect(() => {
+    const text = debouncedLocationText.trim();
+    if (text.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLocationSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    setLocationSuggestLoading(true);
+    suggestPlaces(text, { sessionToken: locationSessionRef.current, language })
+      .then((results) => {
+        if (!cancelled) setLocationSuggestions(results);
+      })
+      .finally(() => {
+        if (!cancelled) setLocationSuggestLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedLocationText, language]);
+
   const runSearch = useCallback(async () => {
     if (!activeProfile) return;
     setLoading(true);
@@ -124,9 +185,10 @@ export default function SearchScreen() {
         }
         next = await searchAddress({
           profileId: activeProfile.id,
-          address: addressText.trim(),
+          ...(addressCoords ?? { address: addressText.trim() }),
           radiusMeters,
           category: category || undefined,
+          language,
         });
       } else if (mode === "location") {
         if (!locationText.trim()) {
@@ -135,9 +197,10 @@ export default function SearchScreen() {
         }
         next = await searchLocation({
           profileId: activeProfile.id,
-          query: locationText.trim(),
+          ...(locationCoords ?? { query: locationText.trim() }),
           radiusMeters,
           category: category || undefined,
+          language,
         });
       } else if (mode === "wayid") {
         const trimmed = wayIdText.trim();
@@ -159,7 +222,7 @@ export default function SearchScreen() {
           setError("Enter a name, business, or podcast to search.");
           return;
         }
-        const unified = await searchAll({ profileId: activeProfile.id, query: trimmed });
+        const unified = await searchAll({ profileId: activeProfile.id, query: trimmed, language });
         setUnifiedResults(unified);
         // No setError here even when everything comes back empty — the
         // dedicated empty state below (driven by unifiedResults itself)
@@ -172,7 +235,22 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeProfile, mode, coords, radiusMeters, category, addressText, locationText, wayIdText, wayIdCountry, allQueryText, refreshDeviceLocation]);
+  }, [
+    activeProfile,
+    mode,
+    coords,
+    radiusMeters,
+    category,
+    addressText,
+    addressCoords,
+    locationText,
+    locationCoords,
+    wayIdText,
+    wayIdCountry,
+    allQueryText,
+    language,
+    refreshDeviceLocation,
+  ]);
 
   useEffect(() => {
     // Runs the search in response to the device location or mode changing;
@@ -192,7 +270,51 @@ export default function SearchScreen() {
     setLoading(true);
     setError(null);
     try {
-      const next = await searchLocation({ profileId: activeProfile.id, lat: loc.lat, lng: loc.lng, radiusMeters, category: category || undefined });
+      const next = await searchLocation({ profileId: activeProfile.id, lat: loc.lat, lng: loc.lng, radiusMeters, category: category || undefined, language });
+      setResults(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Resolves a tapped suggestion to a point and searches on it directly —
+  // mirrors jumpToLocation's "we already have coordinates, don't re-geocode"
+  // shape, rather than routing through runSearch (whose addressText/
+  // locationCoords state wouldn't be updated yet by the time it'd run).
+  async function selectAddressSuggestion(s: PlaceSuggestion) {
+    if (!activeProfile) return;
+    const resolved = await retrievePlace(s.mapboxId, { sessionToken: addressSessionRef.current, language });
+    addressSessionRef.current = newSessionToken();
+    setAddressSuggestions([]);
+    if (!resolved) return;
+    setAddressText(resolved.label);
+    setAddressCoords({ lat: resolved.lat, lng: resolved.lng });
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await searchAddress({ profileId: activeProfile.id, lat: resolved.lat, lng: resolved.lng, radiusMeters, category: category || undefined, language });
+      setResults(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function selectLocationSuggestion(s: PlaceSuggestion) {
+    if (!activeProfile) return;
+    const resolved = await retrievePlace(s.mapboxId, { sessionToken: locationSessionRef.current, language });
+    locationSessionRef.current = newSessionToken();
+    setLocationSuggestions([]);
+    if (!resolved) return;
+    setLocationText(resolved.label);
+    setLocationCoords({ lat: resolved.lat, lng: resolved.lng });
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await searchLocation({ profileId: activeProfile.id, lat: resolved.lat, lng: resolved.lng, radiusMeters, category: category || undefined, language });
       setResults(next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
@@ -262,30 +384,50 @@ export default function SearchScreen() {
         <SearchModeTabs value={mode} onChange={setMode} />
 
         {mode === "address" && (
-          <View style={styles.inputWrap}>
-            <Ionicons name="location-outline" size={18} color={colors.textSecondary} />
-            <TextInput
-              style={styles.input}
-              placeholder="Street address, anywhere on earth"
-              placeholderTextColor={colors.textSecondary}
-              value={addressText}
-              onChangeText={setAddressText}
-              onSubmitEditing={runSearch}
+          <>
+            <View style={styles.inputWrap}>
+              <Ionicons name="location-outline" size={18} color={colors.textSecondary} />
+              <TextInput
+                style={styles.input}
+                placeholder="Street address, anywhere on earth"
+                placeholderTextColor={colors.textSecondary}
+                value={addressText}
+                onChangeText={(text) => {
+                  setAddressText(text);
+                  setAddressCoords(null);
+                }}
+                onSubmitEditing={runSearch}
+              />
+            </View>
+            <PlaceSuggestions
+              suggestions={addressSuggestions}
+              loading={addressSuggestLoading}
+              onSelect={selectAddressSuggestion}
             />
-          </View>
+          </>
         )}
         {mode === "location" && (
-          <View style={styles.inputWrap}>
-            <Ionicons name="earth-outline" size={18} color={colors.textSecondary} />
-            <TextInput
-              style={styles.input}
-              placeholder="Place, city, state, county, or country"
-              placeholderTextColor={colors.textSecondary}
-              value={locationText}
-              onChangeText={setLocationText}
-              onSubmitEditing={runSearch}
+          <>
+            <View style={styles.inputWrap}>
+              <Ionicons name="earth-outline" size={18} color={colors.textSecondary} />
+              <TextInput
+                style={styles.input}
+                placeholder="Place, city, state, county, or country"
+                placeholderTextColor={colors.textSecondary}
+                value={locationText}
+                onChangeText={(text) => {
+                  setLocationText(text);
+                  setLocationCoords(null);
+                }}
+                onSubmitEditing={runSearch}
+              />
+            </View>
+            <PlaceSuggestions
+              suggestions={locationSuggestions}
+              loading={locationSuggestLoading}
+              onSelect={selectLocationSuggestion}
             />
-          </View>
+          </>
         )}
         {mode === "all" && (
           <View style={styles.inputWrap}>

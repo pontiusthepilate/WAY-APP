@@ -1,7 +1,7 @@
 import { api } from "./client";
 import type { NearbyResult, UnifiedSearchResults } from "../types";
 
-function qs(params: Record<string, string | number | undefined>): string {
+export function qs(params: Record<string, string | number | undefined>): string {
   const parts = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== "")
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
@@ -20,9 +20,12 @@ export function searchNearby(input: {
 
 export function searchAddress(input: {
   profileId: string;
-  address: string;
+  lat?: number;
+  lng?: number;
+  address?: string;
   radiusMeters: number;
   category?: string;
+  language?: string;
 }) {
   return api.get<NearbyResult[]>(`/search/address${qs(input)}`);
 }
@@ -34,6 +37,7 @@ export function searchLocation(input: {
   query?: string;
   radiusMeters: number;
   category?: string;
+  language?: string;
 }) {
   return api.get<NearbyResult[]>(`/search/location${qs(input)}`);
 }
@@ -45,6 +49,6 @@ export function searchByWayId(input: { profileId: string; query: string }) {
 
 // Unified multi-entity search — one free-text query matched by name/handle
 // across every profile kind at once, with no distance filtering.
-export function searchAll(input: { profileId: string; query: string }) {
+export function searchAll(input: { profileId: string; query: string; language?: string }) {
   return api.get<UnifiedSearchResults>(`/search/all${qs(input)}`);
 }

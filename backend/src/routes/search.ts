@@ -27,15 +27,27 @@ const nearbyQuery = z.object({
   category: z.string().optional(),
 });
 
-const addressQuery = z.object({
-  profileId: z.string(),
-  address: z.string().min(3),
-  radiusMeters: z.coerce.number().positive().max(MAX_RADIUS_METERS).default(DEFAULT_RADIUS_METERS),
-  category: z.string().optional(),
-});
+// ADDRESS accepts either a client-resolved lat/lng (the mobile app already
+// resolved a suggestion via Mapbox's Search Box API — no point re-geocoding
+// text it already has coordinates for) OR a free-text address that gets
+// geocoded server-side, same either/or shape as LOCATION below.
+const addressQuery = z
+  .object({
+    profileId: z.string(),
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
+    address: z.string().min(3).optional(),
+    radiusMeters: z.coerce.number().positive().max(MAX_RADIUS_METERS).default(DEFAULT_RADIUS_METERS),
+    category: z.string().optional(),
+    language: z.string().optional(),
+  })
+  .refine((v) => (v.lat !== undefined && v.lng !== undefined) || v.address, {
+    message: "Provide either lat & lng, or an address",
+  });
 
-// LOCATION accepts either a map-picked lat/lng OR a free-text place name
-// (city, state, county, country, landmark) that gets geocoded server-side.
+// LOCATION accepts either a map-picked (or suggestion-resolved) lat/lng OR
+// a free-text place name (city, state, county, country, landmark) that
+// gets geocoded server-side.
 const locationQuery = z
   .object({
     profileId: z.string(),
@@ -44,6 +56,7 @@ const locationQuery = z
     query: z.string().min(2).optional(),
     radiusMeters: z.coerce.number().positive().max(MAX_RADIUS_METERS).default(DEFAULT_RADIUS_METERS),
     category: z.string().optional(),
+    language: z.string().optional(),
   })
   .refine((v) => (v.lat !== undefined && v.lng !== undefined) || v.query, {
     message: "Provide either lat & lng, or a place name query",
@@ -57,6 +70,7 @@ const wayIdQuery = z.object({
 const allQuery = z.object({
   profileId: z.string(),
   query: z.string().min(1),
+  language: z.string().optional(),
 });
 
 const UNIFIED_RESULT_LIMIT = 10;
@@ -98,19 +112,29 @@ export async function searchRoutes(app: FastifyInstance) {
     });
   });
 
-  // B) ADDRESS — search around a free-text street address anywhere on earth.
+  // B) ADDRESS — search around a street address anywhere on earth. The
+  // mobile app resolves a typed suggestion to lat/lng itself (via Mapbox's
+  // Search Box API) before calling this, so geocoding here is only the
+  // fallback for a free-text address submitted without picking a suggestion.
   app.get("/search/address", { onRequest: [app.authenticate] }, async (req, reply) => {
     const q = addressQuery.parse(req.query);
-    let point: { lat: number; lng: number };
-    try {
-      point = await geocodeAddress(q.address);
-    } catch (err) {
-      const { status, body } = geocodeErrorResponse(err);
-      return reply.status(status).send(body);
+
+    let lat = q.lat;
+    let lng = q.lng;
+    if ((lat === undefined || lng === undefined) && q.address) {
+      try {
+        const point = await geocodeAddress(q.address, q.language);
+        lat = point.lat;
+        lng = point.lng;
+      } catch (err) {
+        const { status, body } = geocodeErrorResponse(err);
+        return reply.status(status).send(body);
+      }
     }
+
     return findNearbyProfiles({
-      lat: point.lat,
-      lng: point.lng,
+      lat: lat!,
+      lng: lng!,
       radiusMeters: q.radiusMeters,
       category: q.category,
       excludeProfileId: q.profileId,
@@ -128,7 +152,7 @@ export async function searchRoutes(app: FastifyInstance) {
     let lng = q.lng;
     if ((lat === undefined || lng === undefined) && q.query) {
       try {
-        const point = await geocodeAddress(q.query);
+        const point = await geocodeAddress(q.query, q.language);
         lat = point.lat;
         lng = point.lng;
       } catch (err) {
@@ -209,7 +233,7 @@ export async function searchRoutes(app: FastifyInstance) {
       findByKind("business"),
       findByKind("podcast"),
       q.query.trim().length >= 2
-        ? geocodeAddress(q.query).then(
+        ? geocodeAddress(q.query, q.language).then(
             (point) => ({ lat: point.lat, lng: point.lng, label: point.formattedAddress }),
             () => null // not a resolvable place, geocoding unconfigured, etc. — just omit it
           )

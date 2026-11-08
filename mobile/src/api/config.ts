@@ -7,3 +7,9 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost
 // Blank until the project exists — the call screen shows a clear "not set up
 // yet" state instead of attempting to connect when this is empty.
 export const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL ?? "";
+
+// Mapbox's *public* token — deliberately safe to ship inside the client
+// bundle (unlike the backend's own API-style secrets), used for the live
+// place-suggestion autocomplete calls in search.ts. The backend has its own
+// MAPBOX_ACCESS_TOKEN for one-shot geocoding fallback.
+export const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
