@@ -1,9 +1,17 @@
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { useRouter } from "expo-router";
-import RNCallKeep from "react-native-callkeep";
 import * as Notifications from "expo-notifications";
 import { acceptCall, declineCall } from "../api/calls";
 import { setPendingCallSession } from "./activeCallSession";
+
+// react-native-callkeep has no web build at all, and (unlike most RN
+// native-module wrappers) doesn't fail gracefully when called on a platform
+// it doesn't support — RNCallKeepModule.setAvailable() throws synchronously
+// on undefined. Guarding the import itself, once, here, means every call
+// site below (and the three standalone functions other screens call
+// directly) is automatically safe without touching those call sites.
+const RNCallKeep = Platform.OS === "web" ? null : require("react-native-callkeep").default;
 
 const uuidToCallId = new Map<string, string>();
 const callIdToUuid = new Map<string, string>();
@@ -37,7 +45,7 @@ function forgetCall(callId: string | undefined, uuid: string) {
 let didSetup = false;
 
 function setupCallKeep() {
-  if (didSetup) return;
+  if (didSetup || !RNCallKeep) return;
   didSetup = true;
   RNCallKeep.setup({
     ios: {
@@ -79,6 +87,8 @@ export function useCallKeep(profileId: string | undefined) {
   }, []);
 
   useEffect(() => {
+    if (!RNCallKeep) return;
+
     const onAnswer = ({ callUUID }: { callUUID: string }) => {
       const callId = uuidToCallId.get(callUUID);
       const activeProfileId = profileIdRef.current;
@@ -139,16 +149,19 @@ export function useCallKeep(profileId: string | undefined) {
 // Called from the caller's side right after POST /calls succeeds, to show
 // CallKit/ConnectionService's native "calling…" UI.
 export function startOutgoingCallUI(callId: string, calleeDisplayName: string, isVideo: boolean) {
+  if (!RNCallKeep) return;
   const uuid = uuidForCall(callId);
   RNCallKeep.startCall(uuid, callId, calleeDisplayName, "generic", isVideo);
 }
 
 export function reportCallConnected(callId: string) {
+  if (!RNCallKeep) return;
   const uuid = callIdToUuid.get(callId);
   if (uuid) RNCallKeep.reportConnectedOutgoingCallWithUUID(uuid);
 }
 
 export function endCallKeepSession(callId: string) {
+  if (!RNCallKeep) return;
   const uuid = callIdToUuid.get(callId);
   if (uuid) {
     RNCallKeep.endCall(uuid);

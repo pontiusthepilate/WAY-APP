@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -13,6 +13,15 @@ import { safeBack } from "../lib/navigation";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
 
 const DESCRIPTION_MAX_LENGTH = 2000;
+
+// @react-native-community/datetimepicker has no web build (it resolves to a
+// no-op stub there), so web gets a plain HTML date input instead — these
+// convert between that input's local-time "YYYY-MM-DDTHH:mm" string and a
+// real Date, since datetime-local has no timezone suffix of its own.
+function toDateTimeLocalValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 const TITLE_MAX_LENGTH = 140;
 
 // Fixed interest tags rather than freeform text — keeps event search
@@ -142,19 +151,45 @@ export default function EventComposerScreen() {
       </View>
 
       <Text style={styles.label}>When</Text>
-      <Pressable style={styles.dateButton} onPress={() => setShowPicker(true)}>
-        <Text style={styles.dateButtonText}>{startsAt.toLocaleString()}</Text>
-      </Pressable>
-      {showPicker && (
-        <DateTimePicker
-          value={startsAt}
-          mode="datetime"
-          minimumDate={new Date()}
-          onChange={(_, date) => {
-            setShowPicker(false);
-            if (date) setStartsAt(date);
-          }}
-        />
+      {Platform.OS === "web" ? (
+        React.createElement("input", {
+          type: "datetime-local",
+          value: toDateTimeLocalValue(startsAt),
+          min: toDateTimeLocalValue(new Date()),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            const next = new Date(e.target.value);
+            if (!Number.isNaN(next.getTime())) setStartsAt(next);
+          },
+          // Plain DOM style — styles.dateButton's RN shorthands (padding-
+          // Vertical etc.) don't mean anything to a raw <input>'s style prop.
+          style: {
+            backgroundColor: colors.surfaceAlt,
+            borderRadius: radii.md,
+            padding: `${spacing.sm}px ${spacing.md}px`,
+            border: "none",
+            color: colors.textPrimary,
+            fontSize: typography.body.fontSize,
+            fontWeight: "600",
+            width: "100%",
+          },
+        })
+      ) : (
+        <>
+          <Pressable style={styles.dateButton} onPress={() => setShowPicker(true)}>
+            <Text style={styles.dateButtonText}>{startsAt.toLocaleString()}</Text>
+          </Pressable>
+          {showPicker && (
+            <DateTimePicker
+              value={startsAt}
+              mode="datetime"
+              minimumDate={new Date()}
+              onChange={(_, date) => {
+                setShowPicker(false);
+                if (date) setStartsAt(date);
+              }}
+            />
+          )}
+        </>
       )}
 
       <Text style={styles.label}>Interests</Text>

@@ -1,11 +1,10 @@
 import React, { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
-import { registerGlobals } from "@livekit/react-native";
 import Mapbox from "@rnmapbox/maps";
 import { useFonts, Gabarito_600SemiBold, Gabarito_700Bold } from "@expo-google-fonts/gabarito";
 import { SessionProvider, useSession } from "../context/SessionContext";
@@ -19,7 +18,14 @@ import { colors } from "../theme/theme";
 import { MAPBOX_TOKEN } from "../api/config";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
-registerGlobals();
+// @livekit/react-native eagerly pulls in @livekit/react-native-webrtc,
+// whose RTCView calls requireNativeComponent at module scope — react-
+// native-web doesn't implement that, so this crashes the whole app on web
+// if imported unconditionally. Lazy-require it only on native platforms.
+if (Platform.OS !== "web") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("@livekit/react-native").registerGlobals();
+}
 // Same public token search.ts's live suggestions already call Mapbox with
 // directly — the map picker (search.tsx) needs the native SDK to have it
 // too, set once here rather than per-screen.

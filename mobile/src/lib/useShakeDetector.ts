@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { Accelerometer } from "expo-sensors";
 
 const UPDATE_INTERVAL_MS = 100;
@@ -19,6 +20,11 @@ export function useShakeDetector(onShake: () => void) {
   }, [onShake]);
 
   useEffect(() => {
+    // No device to shake on a desktop/laptop browser, and expo-sensors'
+    // web shim needs a DeviceMotion permission flow this app doesn't ask
+    // for — shake-to-reveal just doesn't apply on web.
+    if (Platform.OS === "web") return;
+
     let lastMagnitude = 0;
     let lastShakeAt = 0;
 
