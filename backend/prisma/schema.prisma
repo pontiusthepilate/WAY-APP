@@ -71,6 +71,18 @@ model Profile {
   categories  String[] @default([]) // interests / category tags used for search filtering
   kind        String   @default("personal") // free-form label, e.g. "personal" | "business"
   isVerified  Boolean  @default(false)
+
+  // One of a small fixed set of permanent, non-interactive profiles —
+  // LowC (personal, memorial), WAY Ltd (business), WayCast (podcast) —
+  // auto-followed by every new profile of the matching kind at signup.
+  // No Follow/Unfollow control is ever shown for a profile with this set
+  // (see FollowButton.tsx and routes/follow.ts's guard). defaultLabel is
+  // the distinct, human-readable reason shown wherever it appears (e.g.
+  // "In Loving Memory"), not a single generic badge shared across all of
+  // them — these are different in kind, not interchangeable "defaults".
+  isDefault    Boolean @default(false)
+  defaultLabel String?
+
   // The default answer to "what's your WAY" when a user has more than one
   // profile — exactly one true per user, enforced in application code (see
   // PATCH /profiles/:id/primary), not a DB constraint. The wayId model
@@ -347,6 +359,14 @@ model Follow {
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
+
+  // Set when this row was created by the default-profile auto-follow
+  // mechanism (see routes/profiles.ts's POST /profiles), never by a
+  // user's own Follow button. The target's followersCount is
+  // incremented normally for these, but the follower's own
+  // followingCount deliberately is not — this flag is what lets unfollow
+  // logic mirror that same asymmetry instead of drifting the count.
+  isAutoFollow Boolean @default(false)
 
   @@unique([followerId, followingId])
   @@index([followingId])

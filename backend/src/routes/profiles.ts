@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { syncProfileLocation } from "../lib/geo";
 import { isValidWayId, normalizeWayId } from "../lib/wayId";
+import { autoFollowDefaultProfile } from "../lib/defaultProfiles";
 
 const FREE_PROFILE_LIMIT = 2;
 
@@ -108,8 +109,22 @@ export async function profileRoutes(app: FastifyInstance) {
     // to choose between yet. Later profiles stay non-primary until the user
     // explicitly switches via PATCH /profiles/:id/primary.
     const existingCount = await prisma.profile.count({ where: { userId } });
-    const profile = await prisma.profile.create({
-      data: { ...body, wayId, userId, isPrimary: existingCount === 0 },
+    const profile = await prisma.$transaction(async (tx) => {
+      const created = await tx.profile.create({
+        data: { ...body, wayId, userId, isPrimary: existingCount === 0 },
+      });
+      try {
+        await autoFollowDefaultProfile(tx, created);
+      } catch (err) {
+        // Never block a signup over the tribute/official-account auto-
+        // follow — log and move on. (Prisma transactions abort on any
+        // thrown error, so this catch is what keeps a problem here from
+        // taking the profile-creation transaction down with it; without
+        // it, the whole $transaction — and thus the signup — would roll
+        // back if, say, the default profile row were ever in a bad state.)
+        app.log.warn({ err, profileId: created.id, kind: created.kind }, "auto-follow of default profile failed");
+      }
+      return created;
     });
     reply.status(201).send(profile);
   });

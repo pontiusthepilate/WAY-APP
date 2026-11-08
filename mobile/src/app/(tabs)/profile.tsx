@@ -172,8 +172,16 @@ export default function ProfileScreen() {
 
             <View style={styles.statsRow}>
               <Stat label="Posts" value={posts.length} />
-              <Stat label="Followers" value={activeProfile.followersCount} />
-              <Stat label="Following" value={activeProfile.followingCount} />
+              <Stat
+                label="Followers"
+                value={activeProfile.followersCount}
+                onPress={() => router.push(`/followers/${activeProfile.id}`)}
+              />
+              <Stat
+                label="Following"
+                value={activeProfile.followingCount}
+                onPress={() => router.push(`/following/${activeProfile.id}`)}
+              />
             </View>
           </View>
 
@@ -332,12 +340,18 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <View style={styles.stat}>
+function Stat({ label, value, onPress }: { label: string; value: number; onPress?: () => void }) {
+  const content = (
+    <>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </>
+  );
+  if (!onPress) return <View style={styles.stat}>{content}</View>;
+  return (
+    <Pressable style={styles.stat} onPress={onPress}>
+      {content}
+    </Pressable>
   );
 }
 

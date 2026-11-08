@@ -4,19 +4,23 @@ import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { follow, getFollowStatus, unfollow } from "../api/follow";
 
-export function FollowButton({ targetProfileId }: { targetProfileId: string }) {
+// isDefault profiles (LowC, WAY Ltd, WayCast) are auto-followed once at
+// signup and permanently — not a toggle. No Follow/Unfollow control
+// renders for them at all, for anyone; the backend rejects a direct API
+// call too (see routes/follow.ts), this is just the UI half of that.
+export function FollowButton({ targetProfileId, isDefault }: { targetProfileId: string; isDefault?: boolean }) {
   const { activeProfile } = useSession();
   const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!activeProfile || activeProfile.id === targetProfileId) return;
+    if (!activeProfile || activeProfile.id === targetProfileId || isDefault) return;
     getFollowStatus(targetProfileId, activeProfile.id)
       .then((r) => setIsFollowing(r.following))
       .catch(() => setIsFollowing(false));
-  }, [activeProfile, targetProfileId]);
+  }, [activeProfile, targetProfileId, isDefault]);
 
-  if (!activeProfile || activeProfile.id === targetProfileId || isFollowing === null) return null;
+  if (!activeProfile || activeProfile.id === targetProfileId || isDefault || isFollowing === null) return null;
 
   async function handlePress() {
     if (!activeProfile) return;

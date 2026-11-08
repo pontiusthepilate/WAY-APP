@@ -5,6 +5,10 @@ export function myProfiles() {
   return api.get<Profile[]>("/profiles/me");
 }
 
+export function getProfileByWayId(wayId: string) {
+  return api.get<Profile>(`/profiles/way/${encodeURIComponent(wayId)}`);
+}
+
 export function createProfile(input: {
   wayId: string;
   displayName: string;

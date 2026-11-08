@@ -8,6 +8,13 @@ export interface Profile {
   categories: string[];
   kind: "personal" | "business" | "podcast";
   isVerified: boolean;
+  // One of a small fixed set of permanent, non-interactive profiles
+  // (legacy/official accounts auto-followed by every new signup of a
+  // matching kind) — no Follow/Unfollow control ever renders for these.
+  // defaultLabel is the distinct, human-readable reason shown wherever
+  // the profile appears (e.g. "RQ001"), null for every ordinary profile.
+  isDefault: boolean;
+  defaultLabel: string | null;
   isPrimary: boolean;
   followersCount: number;
   followingCount: number;
@@ -82,6 +89,21 @@ export interface ProfileSummary {
   displayName: string;
   displayPictureUrl: string | null;
   isVerified: boolean;
+}
+
+// A row in GET /profiles/:id/followers or /following — a profile summary
+// plus whether THIS specific relationship is the automatic default-profile
+// follow (drives the pinned/"no action" row treatment in the list screen;
+// unrelated to the target's own isDefault, which marks the profile itself).
+export interface FollowListEntry {
+  id: string;
+  wayId: string;
+  displayName: string;
+  displayPictureUrl: string | null;
+  kind: "personal" | "business" | "podcast";
+  isDefault: boolean;
+  defaultLabel: string | null;
+  isAutoFollow: boolean;
 }
 
 export interface StatusFeedEntry {

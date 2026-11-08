@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { NearbyResult, Profile } from "../types";
 import { formatDistance } from "../lib/formatDistance";
@@ -9,6 +10,8 @@ import { useSession } from "../context/SessionContext";
 import { createBlock, createReport } from "../api/safety";
 import { getProfileLinks } from "../api/profileLinks";
 import { getActiveStatusIds } from "../api/status";
+import { getProfileByWayId } from "../api/profiles";
+import { formatProfileHandle } from "../lib/profileHandle";
 import { Avatar } from "./Avatar";
 
 const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -55,6 +58,7 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
   if (result && result !== mountedResult) setMountedResult(result);
 
   const { activeProfile } = useSession();
+  const router = useRouter();
   const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const pendingActionRef = useRef<(() => void) | null>(null);
@@ -62,15 +66,25 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [links, setLinks] = useState<Profile[]>([]);
   const [hasActiveStatus, setHasActiveStatus] = useState(false);
+  // NearbyResult (what search/feed hand this modal) doesn't carry
+  // follower/following counts or the isDefault/defaultLabel fields — those
+  // only live on the full Profile, fetched here the same way links/status
+  // already are rather than widening every search query for it.
+  const [fullProfile, setFullProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     if (!result) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFullProfile(null);
     getProfileLinks(result.id)
       .then(setLinks)
       .catch(() => setLinks([]));
     getActiveStatusIds([result.id])
       .then((ids) => setHasActiveStatus(ids.includes(result.id)))
       .catch(() => setHasActiveStatus(false));
+    getProfileByWayId(result.wayId)
+      .then(setFullProfile)
+      .catch(() => setFullProfile(null));
   }, [result]);
 
   useEffect(() => {
@@ -111,6 +125,13 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
 
   if (!mountedResult) return null;
   const shown = mountedResult;
+  // LowC/WAY Ltd/WayCast are display-only — no action (follow, mute,
+  // block, report, WAY request, message, camera request) can be
+  // initiated to or on them by anyone. fullProfile is null for the first
+  // render or two (fetched async), so this starts false and the action
+  // controls briefly flash in before hiding on these 3 profiles — an
+  // acceptable tradeoff over blocking the whole sheet on that fetch.
+  const isDefault = fullProfile?.isDefault ?? false;
 
   async function handleBlock() {
     if (!activeProfile) return;
@@ -158,18 +179,20 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
         <View style={styles.handle} />
 
-        <Pressable
-          style={styles.kebabButton}
-          onPress={() => {
-            setReportMenuOpen(false);
-            setMenuOpen((open) => !open);
-          }}
-          hitSlop={8}
-        >
-          <Text style={styles.kebabText}>⋯</Text>
-        </Pressable>
+        {!isDefault && (
+          <Pressable
+            style={styles.kebabButton}
+            onPress={() => {
+              setReportMenuOpen(false);
+              setMenuOpen((open) => !open);
+            }}
+            hitSlop={8}
+          >
+            <Text style={styles.kebabText}>⋯</Text>
+          </Pressable>
+        )}
 
-        {menuOpen && !reportMenuOpen && (
+        {!isDefault && menuOpen && !reportMenuOpen && (
           <View style={styles.dropdown}>
             <Pressable style={styles.dropdownItem} onPress={handleMute}>
               <Text style={styles.dropdownItemText}>Mute</Text>
@@ -183,7 +206,7 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
           </View>
         )}
 
-        {reportMenuOpen && (
+        {!isDefault && reportMenuOpen && (
           <View style={styles.dropdown}>
             {REPORT_REASONS.map((reason) => (
               <Pressable key={reason} style={styles.dropdownItem} onPress={() => handleReport(reason)}>
@@ -198,11 +221,37 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
         </View>
 
         <Text style={styles.name}>{shown.displayName}</Text>
-        <Text style={styles.way}>WAY/{shown.wayId}</Text>
+        <Text style={styles.way}>{formatProfileHandle({ wayId: shown.wayId, isDefault })}</Text>
+        {fullProfile?.isDefault && fullProfile.defaultLabel && (
+          <View style={styles.defaultBadge}>
+            <Text style={styles.defaultBadgeText}>{fullProfile.defaultLabel}</Text>
+          </View>
+        )}
 
-        <View style={styles.followRow}>
-          <FollowButton targetProfileId={shown.id} />
-        </View>
+        {!isDefault && (
+          <View style={styles.followRow}>
+            <FollowButton targetProfileId={shown.id} />
+          </View>
+        )}
+
+        {fullProfile && (
+          <View style={styles.statsRow}>
+            <Pressable
+              style={styles.stat}
+              onPress={() => closeThen(() => router.push(`/followers/${shown.id}`))}
+            >
+              <Text style={styles.statValue}>{fullProfile.followersCount}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </Pressable>
+            <Pressable
+              style={styles.stat}
+              onPress={() => closeThen(() => router.push(`/following/${shown.id}`))}
+            >
+              <Text style={styles.statValue}>{fullProfile.followingCount}</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.statsRow}>
           {shown.distanceMeters != null && <Stat label="Distance" value={formatDistance(shown.distanceMeters)} />}
@@ -242,15 +291,19 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
           </View>
         )}
 
-        <Pressable style={styles.requestButton} onPress={() => closeThen(() => onSendRequest(shown))}>
-          <Text style={styles.requestButtonText}>Send WAY Request</Text>
-        </Pressable>
-        <Pressable style={styles.cameraButton} onPress={() => closeThen(() => onMessage(shown))}>
-          <Text style={styles.cameraButtonText}>Message</Text>
-        </Pressable>
-        <Pressable style={styles.cameraButton} onPress={() => closeThen(() => onRequestCamera(shown))}>
-          <Text style={styles.cameraButtonText}>Request Camera Access</Text>
-        </Pressable>
+        {!isDefault && (
+          <>
+            <Pressable style={styles.requestButton} onPress={() => closeThen(() => onSendRequest(shown))}>
+              <Text style={styles.requestButtonText}>Send WAY Request</Text>
+            </Pressable>
+            <Pressable style={styles.cameraButton} onPress={() => closeThen(() => onMessage(shown))}>
+              <Text style={styles.cameraButtonText}>Message</Text>
+            </Pressable>
+            <Pressable style={styles.cameraButton} onPress={() => closeThen(() => onRequestCamera(shown))}>
+              <Text style={styles.cameraButtonText}>Request Camera Access</Text>
+            </Pressable>
+          </>
+        )}
       </Animated.View>
     </View>
   );
@@ -314,6 +367,14 @@ const styles = StyleSheet.create({
   avatarWrap: { marginBottom: spacing.sm },
   name: { ...typography.h2, color: colors.textPrimary },
   way: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
+  defaultBadge: {
+    marginTop: spacing.xs,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.pill,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+  },
+  defaultBadgeText: { ...typography.caption, color: colors.primaryDark, fontWeight: "700" },
   followRow: { marginTop: spacing.sm },
   statsRow: { flexDirection: "row", marginTop: spacing.md, gap: spacing.lg },
   stat: { alignItems: "center" },

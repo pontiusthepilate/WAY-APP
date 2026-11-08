@@ -41,6 +41,17 @@ async function main() {
   await app.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret-change-me" });
   await app.register(multipart);
   await app.register(fastifyStatic, { root: path.join(process.cwd(), "uploads"), prefix: "/uploads/" });
+  // Unlike /uploads (user-submitted, written at runtime, wiped on every
+  // redeploy — no Fly volume mounted), this serves assets committed to
+  // the repo and copied into the image at build time, for the handful of
+  // permanent default-profile images that must survive every redeploy.
+  // decorateReply: false for the same reason as the web root below — only
+  // one static registration can own reply.sendFile.
+  await app.register(fastifyStatic, {
+    root: path.join(process.cwd(), "public-assets"),
+    prefix: "/public-assets/",
+    decorateReply: false,
+  });
 
   // The Expo web export (mobile/dist, copied to ./web at build time) is a
   // single-page app — one index.html plus hashed JS/asset files under their

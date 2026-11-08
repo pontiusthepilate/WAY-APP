@@ -34,6 +34,7 @@ COPY --from=backend-build /app/package.json /app/package-lock.json ./
 COPY --from=backend-build /app/node_modules ./node_modules
 COPY --from=backend-build /app/dist ./dist
 COPY --from=backend-build /app/prisma ./prisma
+COPY --from=backend-build /app/public-assets ./public-assets
 COPY --from=web-build /web/dist ./web
 RUN mkdir -p uploads
 EXPOSE 8080
