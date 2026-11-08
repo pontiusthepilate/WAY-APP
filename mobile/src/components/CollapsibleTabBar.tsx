@@ -247,6 +247,7 @@ const styles = StyleSheet.create({
     height: ARROW_SIZE,
     alignItems: "center",
     justifyContent: "center",
+    transform: [{ translateY: 14 }],
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 4,
