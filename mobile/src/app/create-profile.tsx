@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radii, spacing, typography } from "../theme/theme";
+import { colors, legibleText, radii, spacing, typography } from "../theme/theme";
 import { createProfile, getProfileByWay } from "../api/profiles";
 import {
   getPodcastPlan,
@@ -16,7 +16,7 @@ import {
 import { formatCurrency } from "../lib/formatCurrency";
 import { ApiError } from "../api/client";
 import { useSession } from "../context/SessionContext";
-import { SkyOceanBackground } from "../components/SkyOceanBackground";
+import { OceanWavesBackground } from "../components/OceanWavesBackground";
 import { DotOutline } from "../components/DotOutline";
 
 type Kind = "personal" | "business" | "podcast";
@@ -146,7 +146,7 @@ export default function CreateProfileScreen() {
 
   return (
     <View style={styles.root}>
-      <SkyOceanBackground tone="pale" />
+      <OceanWavesBackground source={require("../../assets/ocean-waves-welcome.mp4")} tone="pale" />
       <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Choose your WAY</Text>
       <Text style={styles.subtitle}>
@@ -265,9 +265,17 @@ export default function CreateProfileScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   container: { flexGrow: 1, padding: spacing.xl, justifyContent: "center" },
-  title: { ...typography.h1, color: colors.textPrimary, textAlign: "center" },
-  subtitle: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm, marginBottom: spacing.lg },
-  label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md },
+  title: { ...typography.h1, ...legibleText("onLight"), textAlign: "center" },
+  subtitle: {
+    ...typography.body,
+    ...legibleText("onLight"),
+    color: colors.textPrimary,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  label: { ...typography.caption, ...legibleText("onLight"), marginBottom: spacing.xs, marginTop: spacing.md },
   wayInputWrap: {
     flexDirection: "row",
     alignItems: "center",
