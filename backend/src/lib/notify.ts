@@ -127,12 +127,17 @@ async function trySendWhatsAppOtp(
 // Nigerian SMS gateways expect the bare international-format digits, e.g.
 // "2348012345678") — `identifier` here is already E.164 from sign-in.
 //
-// Field names (api_key in the body, to/from/sms/type/channel) are per
-// Termii's public developer reference as of this writing; their docs page
-// couldn't be re-fetched to double-check during this change (returned a
-// 404 when verifying), so the full response body is logged on every call,
-// not just failures, until a live send confirms the exact response shape —
-// trim that logging once confirmed.
+// Field names and the "dnd" channel are confirmed against Termii's real docs
+// (developers.termii.com/messaging-api, checked directly — an earlier check
+// hit a 404 on the wrong URL). "from" (the Sender ID) is a required field
+// with no generic/shared fallback — confirmed via a live call that got a
+// clean SENDER_ID_NOT_APPROVED response once a real Sender ID is requested
+// but not yet approved, there is nothing to fall back to until it clears.
+// Channel is "dnd", not "generic": Termii's docs explicitly say generic
+// "should not be used for sending OTP or transactional messages" (also
+// blocked to MTN Nigeria 8PM-8AM and to any DND-registered number) — "dnd"
+// is what they recommend for OTPs, but it needs separate account activation
+// (email support@termii.com), independent of Sender ID approval.
 async function sendTermiiSms(identifier: string, message: string): Promise<void> {
   const res = await fetch("https://api.ng.termii.com/api/sms/send", {
     method: "POST",
@@ -143,7 +148,7 @@ async function sendTermiiSms(identifier: string, message: string): Promise<void>
       from: process.env.TERMII_SENDER_ID || "Termii",
       sms: message,
       type: "plain",
-      channel: "generic",
+      channel: "dnd",
     }),
   });
   const body = await res.text();
