@@ -172,8 +172,17 @@ export default function SearchScreen() {
     };
   }, [debouncedLocationText, language]);
 
-  const runSearch = useCallback(async () => {
+  // Accepts an optional category override so a fresh pick from the
+  // category sheet (direct, sentence-matched, or "Clear") can run the
+  // search immediately instead of waiting for `category` state to
+  // re-render — picking a category then has to feel like it "just runs
+  // the search", not require a separate tap on the Search button.
+  // Guarded with a typeof check since onSubmitEditing wires this same
+  // function straight to TextInput, which calls it with a native event
+  // object, not a string.
+  const runSearch = useCallback(async (categoryOverride?: string) => {
     if (!activeProfile) return;
+    const cat = typeof categoryOverride === "string" ? categoryOverride : category;
     setLoading(true);
     setError(null);
     try {
@@ -184,7 +193,7 @@ export default function SearchScreen() {
           setError("Turn on location access to search nearby.");
           return;
         }
-        next = await searchNearby({ profileId: activeProfile.id, radiusMeters, category: category || undefined, ...point });
+        next = await searchNearby({ profileId: activeProfile.id, radiusMeters, category: cat || undefined, ...point });
       } else if (mode === "address") {
         if (!addressText.trim()) {
           setError("Enter a street address to search.");
@@ -194,7 +203,7 @@ export default function SearchScreen() {
           profileId: activeProfile.id,
           ...(addressCoords ?? { address: addressText.trim() }),
           radiusMeters,
-          category: category || undefined,
+          category: cat || undefined,
           language,
         });
       } else if (mode === "location") {
@@ -206,7 +215,7 @@ export default function SearchScreen() {
           profileId: activeProfile.id,
           ...(locationCoords ?? { query: locationText.trim() }),
           radiusMeters,
-          category: category || undefined,
+          category: cat || undefined,
           language,
         });
       } else if (mode === "wayid") {
@@ -527,6 +536,7 @@ export default function SearchScreen() {
               onSelect={(name) => {
                 setCategory(name);
                 setCategoryPickerOpen(false);
+                runSearch(name);
               }}
             />
           </>

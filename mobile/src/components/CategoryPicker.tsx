@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { INTERESTS } from "../lib/interests";
+import { matchCategories } from "../lib/categoryMatch";
 import { suggestCategory } from "../api/categorySuggestions";
 import { useSession } from "../context/SessionContext";
 
@@ -85,13 +86,28 @@ function SuggestCategoryRow({ query }: { query: string }) {
 export function CategoryPickerSheet({ open, onClose, onSelect }: SheetProps) {
   const [query, setQuery] = useState("");
 
-  const sections = useMemo(() => {
+  const directSections = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return SECTIONS;
     return SECTIONS.map((s) => ({ ...s, data: s.data.filter((name) => name.toLowerCase().includes(q)) })).filter(
       (s) => s.data.length > 0
     );
   }, [query]);
+
+  // Falls back to keyword-matching a longer, sentence-style query ("I love
+  // cooking and hiking on weekends") against the whole taxonomy once a
+  // plain substring search on category names comes up empty — lets people
+  // describe what they're after instead of having to already know the
+  // exact tag name. Only kicks in for multi-word input so a single typo'd
+  // word still falls through to the "suggest a new category" row below.
+  const suggestedSections = useMemo(() => {
+    if (directSections.length > 0) return [];
+    if (query.trim().split(/\s+/).filter(Boolean).length < 2) return [];
+    const matches = matchCategories(query);
+    return matches.length > 0 ? [{ title: "Suggested for you", data: matches }] : [];
+  }, [query, directSections]);
+
+  const sections = directSections.length > 0 ? directSections : suggestedSections;
 
   function handleSelect(name: string) {
     onSelect(name);
@@ -114,10 +130,11 @@ export function CategoryPickerSheet({ open, onClose, onSelect }: SheetProps) {
           <Ionicons name="search-outline" size={18} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search categories"
+            placeholder="Search, or describe what you're looking for"
             placeholderTextColor={colors.textSecondary}
             autoCapitalize="none"
-            autoCorrect={false}
+            autoCorrect
+            multiline
             value={query}
             onChangeText={setQuery}
           />
@@ -167,13 +184,23 @@ interface MultiSheetProps {
 export function CategoryPickerSheetMulti({ open, onClose, selected, onToggle, max }: MultiSheetProps) {
   const [query, setQuery] = useState("");
 
-  const sections = useMemo(() => {
+  const directSections = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return SECTIONS;
     return SECTIONS.map((s) => ({ ...s, data: s.data.filter((name) => name.toLowerCase().includes(q)) })).filter(
       (s) => s.data.length > 0
     );
   }, [query]);
+
+  // Same sentence-style fallback as CategoryPickerSheet — see its comment.
+  const suggestedSections = useMemo(() => {
+    if (directSections.length > 0) return [];
+    if (query.trim().split(/\s+/).filter(Boolean).length < 2) return [];
+    const matches = matchCategories(query);
+    return matches.length > 0 ? [{ title: "Suggested for you", data: matches }] : [];
+  }, [query, directSections]);
+
+  const sections = directSections.length > 0 ? directSections : suggestedSections;
 
   const atMax = selected.length >= max;
 
@@ -194,10 +221,11 @@ export function CategoryPickerSheetMulti({ open, onClose, selected, onToggle, ma
           <Ionicons name="search-outline" size={18} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search categories"
+            placeholder="Search, or describe what you're into"
             placeholderTextColor={colors.textSecondary}
             autoCapitalize="none"
-            autoCorrect={false}
+            autoCorrect
+            multiline
             value={query}
             onChangeText={setQuery}
           />
