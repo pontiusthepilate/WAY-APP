@@ -15,30 +15,34 @@ import AfricasTalkingInit from "africastalking";
 // provisioning time; AFRICASTALKING_WHATSAPP_NUMBER/_TEMPLATE_ID stay
 // unset until that's done, so this silently no-ops to SMS until then.
 //
-// SMS goes through Africa's Talking rather than a generic SMS API: a plain
-// international long code (what a Twilio US number is, from Nigeria's
-// perspective) isn't reliably deliverable to Nigerian numbers — MTN, Airtel,
-// and 9mobile reject numeric international sender IDs outright, since this
-// app's users are predominantly Nigerian (+234 default country code). The
-// same Africa's Talking account/app provides WhatsApp too (same SDK, a
-// `WHATSAPP` namespace alongside `SMS`), so no second provider relationship
-// is needed for the fallback.
+// SMS fallback order is WhatsApp (via Africa's Talking) -> Termii -> Africa's
+// Talking SMS. Termii sits ahead of AT's own SMS send because AT's SMS
+// sending has been failing account-side (401 "supplied authentication is
+// invalid", unresolved as of this writing despite a regenerated key and a
+// cleared account-verification banner — see AT support ticket). AT SMS is
+// kept as a further fallback rather than removed outright, so if that issue
+// resolves later it's still in the chain for free; AT's WhatsApp path is
+// unaffected by the SMS-specific auth problem and stays first since it's
+// effectively free (no per-message cost) and reaches a richer client — see
+// trySendWhatsAppOtp. A plain international long code (what a Twilio US
+// number is, from Nigeria's perspective) isn't reliably deliverable to
+// Nigerian numbers — MTN, Airtel, and 9mobile reject numeric international
+// sender IDs outright, since this app's users are predominantly Nigerian
+// (+234 default country code) — hence routing through providers (AT,
+// Termii) with real Nigerian delivery rather than a generic SMS API.
 //
 // Email goes through Resend rather than SendGrid — SendGrid/Twilio's unified
 // account system rejected the signup for this domain outright ("can't
 // activate your account for security reasons", no further detail given).
 export async function sendOtp(identifier: string, code: string): Promise<{ devCode?: string }> {
   const isEmail = identifier.includes("@");
-  const providerConfigured = isEmail
-    ? Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL)
-    : Boolean(process.env.AFRICASTALKING_API_KEY && process.env.AFRICASTALKING_USERNAME);
-
-  if (!providerConfigured) {
-    console.log(`[WAY][dev-otp] ${identifier} -> ${code}`);
-    return { devCode: code };
-  }
 
   if (isEmail) {
+    const providerConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+    if (!providerConfigured) {
+      console.log(`[WAY][dev-otp] ${identifier} -> ${code}`);
+      return { devCode: code };
+    }
     const resend = new Resend(process.env.RESEND_API_KEY!);
     const { error } = await resend.emails.send({
       to: identifier,
@@ -51,18 +55,35 @@ export async function sendOtp(identifier: string, code: string): Promise<{ devCo
     return {};
   }
 
-  const africasTalking = AfricasTalkingInit({
-    apiKey: process.env.AFRICASTALKING_API_KEY!,
-    username: process.env.AFRICASTALKING_USERNAME!,
-  });
+  const atConfigured = Boolean(process.env.AFRICASTALKING_API_KEY && process.env.AFRICASTALKING_USERNAME);
+  const termiiConfigured = Boolean(process.env.TERMII_API_KEY);
+  if (!atConfigured && !termiiConfigured) {
+    console.log(`[WAY][dev-otp] ${identifier} -> ${code}`);
+    return { devCode: code };
+  }
 
-  if (await trySendWhatsAppOtp(africasTalking, identifier, code)) return {};
+  const message = `${code} is your WAY verification code. It expires in 10 minutes.`;
 
-  await africasTalking.SMS.send({
-    to: [identifier],
-    message: `${code} is your WAY verification code. It expires in 10 minutes.`,
-    ...(process.env.AFRICASTALKING_SENDER_ID ? { senderId: process.env.AFRICASTALKING_SENDER_ID } : {}),
-  });
+  if (atConfigured) {
+    const africasTalking = AfricasTalkingInit({
+      apiKey: process.env.AFRICASTALKING_API_KEY!,
+      username: process.env.AFRICASTALKING_USERNAME!,
+    });
+
+    if (await trySendWhatsAppOtp(africasTalking, identifier, code)) return {};
+    if (termiiConfigured && (await trySendTermiiSms(identifier, message))) return {};
+
+    await africasTalking.SMS.send({
+      to: [identifier],
+      message,
+      ...(process.env.AFRICASTALKING_SENDER_ID ? { senderId: process.env.AFRICASTALKING_SENDER_ID } : {}),
+    });
+    return {};
+  }
+
+  // Africa's Talking isn't configured at all — Termii is the only option,
+  // so let a failure here throw (and surface) rather than swallowing it.
+  await sendTermiiSms(identifier, message);
   return {};
 }
 
@@ -94,6 +115,54 @@ async function trySendWhatsAppOtp(
     return true;
   } catch (err) {
     console.warn(`[WAY][otp] WhatsApp send to ${identifier} failed, falling back to SMS:`, err);
+    return false;
+  }
+}
+
+// Termii (https://termii.com) — an Africa-focused SMS provider, added as a
+// cheaper, independent fallback while Africa's Talking's own SMS sending is
+// broken account-side (see sendOtp's comment). Plain REST call rather than
+// an SDK: Termii doesn't ship an official Node client, and the API is a
+// single JSON POST. Identifier is sent without a leading "+" (Termii/most
+// Nigerian SMS gateways expect the bare international-format digits, e.g.
+// "2348012345678") — `identifier` here is already E.164 from sign-in.
+//
+// Field names (api_key in the body, to/from/sms/type/channel) are per
+// Termii's public developer reference as of this writing; their docs page
+// couldn't be re-fetched to double-check during this change (returned a
+// 404 when verifying), so the full response body is logged on every call,
+// not just failures, until a live send confirms the exact response shape —
+// trim that logging once confirmed.
+async function sendTermiiSms(identifier: string, message: string): Promise<void> {
+  const res = await fetch("https://api.ng.termii.com/api/sms/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: process.env.TERMII_API_KEY,
+      to: identifier.replace(/^\+/, ""),
+      from: process.env.TERMII_SENDER_ID || "Termii",
+      sms: message,
+      type: "plain",
+      channel: "generic",
+    }),
+  });
+  const body = await res.text();
+  console.log(`[WAY][otp] Termii response for ${identifier} (status ${res.status}): ${body}`);
+  if (!res.ok) {
+    throw new Error(`Termii SMS failed (${res.status}): ${body}`);
+  }
+}
+
+// Never-throws wrapper for use as a mid-chain fallback (WhatsApp -> Termii ->
+// AT SMS) — mirrors trySendWhatsAppOtp's pattern. When Termii is the only
+// configured provider, sendOtp calls sendTermiiSms directly instead so a
+// failure still surfaces.
+async function trySendTermiiSms(identifier: string, message: string): Promise<boolean> {
+  try {
+    await sendTermiiSms(identifier, message);
+    return true;
+  } catch (err) {
+    console.warn(`[WAY][otp] Termii SMS to ${identifier} failed, falling back:`, err);
     return false;
   }
 }
