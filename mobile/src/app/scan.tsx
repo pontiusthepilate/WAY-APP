@@ -61,6 +61,10 @@ export default function ScanScreen() {
     router.replace(`/messages/${conversation.id}`);
   }
 
+  function openViewProfile(result: NearbyResult) {
+    router.replace({ pathname: "/profile/[id]", params: { id: result.id } });
+  }
+
   return (
     <View style={styles.container}>
       {permission?.granted ? (
@@ -109,6 +113,7 @@ export default function ScanScreen() {
         onSendRequest={openRequest}
         onRequestCamera={openCameraRequest}
         onMessage={openMessage}
+        onViewProfile={openViewProfile}
         onOpenProfile={setFound}
       />
     </View>

@@ -5,6 +5,7 @@ import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { syncProfileLocation } from "../lib/geo";
 import { isValidWayId, normalizeWayId } from "../lib/wayId";
 import { autoFollowDefaultProfile } from "../lib/defaultProfiles";
+import { computeProfileAccessLevel, restrictedProfileView } from "../lib/profileAccess";
 
 const FREE_PROFILE_LIMIT = 2;
 
@@ -13,6 +14,7 @@ const createProfileBody = z.object({
   displayName: z.string().min(1).max(40),
   displayPictureUrl: z.string().url().optional(),
   bio: z.string().max(280).optional(),
+  whichWay: z.string().max(150).optional(),
   categories: z.array(z.string().min(1).max(30)).max(10).default([]),
   kind: z.enum(["personal", "business", "podcast"]).default("personal"),
 });
@@ -23,8 +25,23 @@ const updateProfileBody = z.object({
   // the existing value untouched.
   displayPictureUrl: z.string().url().nullable().optional(),
   bio: z.string().max(280).optional(),
+  whichWay: z.string().max(150).optional(),
   categories: z.array(z.string().min(1).max(30)).max(10).optional(),
 });
+
+// Auto-grant-full-profile-access rules (feature: profile access) — a
+// separate route from /visibility and /privacy since it's a distinct
+// setting group (see privacy.tsx's "Who gets full profile access" section).
+const accessGrantBody = z.object({
+  autoGrantAccessViaNearby: z.boolean().optional(),
+  autoGrantAccessViaAddress: z.boolean().optional(),
+  autoGrantAccessViaLocation: z.boolean().optional(),
+  autoGrantAccessToPersonal: z.boolean().optional(),
+  autoGrantAccessToBusiness: z.boolean().optional(),
+  autoGrantAccessToPodcast: z.boolean().optional(),
+});
+
+const profileViewQuery = z.object({ viewerProfileId: z.string() });
 
 const visibilityBody = z.object({
   isVisible: z.boolean().optional(),
@@ -151,6 +168,21 @@ export async function profileRoutes(app: FastifyInstance) {
     reply.send(profile);
   });
 
+  // Gated full-profile fetch for the new full-profile page (feature:
+  // profile access) — additive alongside GET /profiles/way/:wayId above,
+  // which stays exactly as-is (used by the existing mini-profile modal,
+  // unrestricted). Returns the full row only when computeProfileAccessLevel
+  // says so; otherwise the same restricted field subset the mini-profile
+  // already shows.
+  app.get("/profiles/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { viewerProfileId } = profileViewQuery.parse(req.query);
+    const owner = await prisma.profile.findUnique({ where: { id } });
+    if (!owner) return reply.status(404).send({ error: "Not found" });
+    const accessLevel = await computeProfileAccessLevel(viewerProfileId, owner);
+    reply.send({ accessLevel, profile: accessLevel === "full" ? owner : restrictedProfileView(owner) });
+  });
+
   app.patch("/profiles/:id", { onRequest: [app.authenticate] }, async (req) => {
     const { userId } = requireUser(req);
     const { id } = req.params as { id: string };
@@ -180,6 +212,14 @@ export async function profileRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     await assertOwnsProfile(userId, id);
     const body = privacyBody.parse(req.body);
+    return prisma.profile.update({ where: { id }, data: body });
+  });
+
+  app.patch("/profiles/:id/access-grants", { onRequest: [app.authenticate] }, async (req) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    await assertOwnsProfile(userId, id);
+    const body = accessGrantBody.parse(req.body);
     return prisma.profile.update({ where: { id }, data: body });
   });
 

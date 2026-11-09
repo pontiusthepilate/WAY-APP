@@ -18,6 +18,8 @@ const MESSAGE_BY_TYPE: Record<NotificationType, (name: string) => string> = {
   way_request: (name) => `${name} sent you a WAY request`,
   camera_request: (name) => `${name} wants to see your camera`,
   go_live: (name) => `${name} is live now`,
+  profile_access_request: (name) => `${name} requested access to your full profile`,
+  profile_access_response: (name) => `${name} responded to your profile access request`,
 };
 
 // like/comment target either a Post or an Episode (disambiguated by which
@@ -61,6 +63,7 @@ export default function NotificationsScreen() {
     }
     if (notification.episodeId) router.push(`/episode/${notification.episodeId}`);
     else if (notification.postId) router.push(`/post/${notification.postId}`);
+    else if (notification.profileAccessRequestId) router.push(`/profile-access-request/${notification.profileAccessRequestId}`);
   }
 
   async function handleMarkAllRead() {

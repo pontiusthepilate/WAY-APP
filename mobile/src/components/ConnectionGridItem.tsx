@@ -18,6 +18,7 @@ export function ConnectionGridItem({
     <Pressable style={styles.card} onPress={onPress}>
       <Avatar uri={result.displayPictureUrl} displayName={result.displayName} size={64} hasActiveStatus={hasActiveStatus} />
       <Text style={[styles.name, styles.nameSpacing]} numberOfLines={1}>{result.displayName}</Text>
+      {result.whichWay && <Text style={styles.teaser} numberOfLines={1}>{result.whichWay}</Text>}
       <Text style={styles.distance}>{formatDistance(result.distanceMeters)}</Text>
     </Pressable>
   );
@@ -36,5 +37,6 @@ const styles = StyleSheet.create({
   },
   name: { ...typography.body, fontWeight: "600", color: colors.textPrimary },
   nameSpacing: { marginTop: spacing.xs },
+  teaser: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   distance: { ...typography.caption, color: colors.primaryDark, marginTop: 2 },
 });

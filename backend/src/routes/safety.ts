@@ -4,7 +4,7 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 
-const blockType = z.enum(["block", "mute"]);
+const blockType = z.enum(["block", "mute", "access_request"]);
 
 const createBlockBody = z.object({ profileId: z.string(), targetProfileId: z.string(), type: blockType });
 const removeBlockQuery = z.object({ profileId: z.string(), type: blockType });

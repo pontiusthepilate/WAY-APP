@@ -13,12 +13,13 @@ import { getProfileEpisodes } from "../../api/episodes";
 import { getScheduledLiveSessions, startLiveSession } from "../../api/live";
 import { getIncomingCameraRequests } from "../../api/remoteCamera";
 import { getIncomingWayRequests } from "../../api/wayRequests";
+import { getIncomingProfileAccessRequests } from "../../api/profileAccessRequests";
 import { setPrimaryProfile, updateProfile } from "../../api/profiles";
 import { uploadMedia } from "../../api/uploads";
 import { getActiveStatusIds } from "../../api/status";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 import { Avatar } from "../../components/Avatar";
-import type { Episode, LiveSession, Post, RemoteCameraRequest, WayRequest } from "../../types";
+import type { Episode, LiveSession, Post, ProfileAccessRequest, RemoteCameraRequest, WayRequest } from "../../types";
 
 const COLUMNS = 3;
 const TILE_SIZE = Dimensions.get("window").width / COLUMNS;
@@ -39,6 +40,7 @@ export default function ProfileScreen() {
   const [scheduled, setScheduled] = useState<LiveSession[]>([]);
   const [cameraRequests, setCameraRequests] = useState<RemoteCameraRequest[]>([]);
   const [wayRequests, setWayRequests] = useState<WayRequest[]>([]);
+  const [accessRequests, setAccessRequests] = useState<ProfileAccessRequest[]>([]);
   const [pictureMenuOpen, setPictureMenuOpen] = useState(false);
   const [pictureSaving, setPictureSaving] = useState(false);
   const [hasActiveStatus, setHasActiveStatus] = useState(false);
@@ -46,11 +48,12 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!activeProfile) return;
     try {
-      const [page, upcoming, incomingCamera, incomingWay, activeStatusIds, episodePage] = await Promise.all([
+      const [page, upcoming, incomingCamera, incomingWay, incomingAccess, activeStatusIds, episodePage] = await Promise.all([
         getProfilePosts(activeProfile.id, { viewerProfileId: activeProfile.id, limit: 50 }).catch(() => ({ posts: [], nextCursor: null })),
         getScheduledLiveSessions(activeProfile.id).catch(() => []),
         getIncomingCameraRequests(activeProfile.id).catch(() => []),
         getIncomingWayRequests(activeProfile.id).catch(() => []),
+        getIncomingProfileAccessRequests(activeProfile.id).catch(() => []),
         getActiveStatusIds([activeProfile.id]).catch((): string[] => []),
         activeProfile.kind === "podcast"
           ? getProfileEpisodes(activeProfile.id, { limit: 20, viewerProfileId: activeProfile.id }).catch(() => ({
@@ -63,6 +66,7 @@ export default function ProfileScreen() {
       setScheduled(upcoming);
       setCameraRequests(incomingCamera.filter((r) => r.status === "pending"));
       setWayRequests(incomingWay.filter((r) => r.status === "pending"));
+      setAccessRequests(incomingAccess.filter((r) => r.status === "pending"));
       setHasActiveStatus(activeStatusIds.includes(activeProfile.id));
       setEpisodes(episodePage.episodes);
     } catch {
@@ -276,6 +280,27 @@ export default function ProfileScreen() {
                 >
                   <View style={styles.upcomingInfo}>
                     <Text style={styles.upcomingTitle}>{r.fromProfile?.displayName ?? "Someone"} wants your camera</Text>
+                    <Text style={styles.upcomingTime}>{r.message ?? "Tap to review"}</Text>
+                  </View>
+                  <View style={styles.startButton}>
+                    <Text style={styles.startButtonText}>Review</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {accessRequests.length > 0 && (
+            <View style={styles.upcomingSection}>
+              <Text style={styles.sectionTitle}>Profile Access Requests</Text>
+              {accessRequests.map((r) => (
+                <Pressable
+                  key={r.id}
+                  style={styles.upcomingRow}
+                  onPress={() => router.push(`/profile-access-request/${r.id}`)}
+                >
+                  <View style={styles.upcomingInfo}>
+                    <Text style={styles.upcomingTitle}>{r.fromProfile?.displayName ?? "Someone"} requested full profile access</Text>
                     <Text style={styles.upcomingTime}>{r.message ?? "Tap to review"}</Text>
                   </View>
                   <View style={styles.startButton}>

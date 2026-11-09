@@ -14,6 +14,7 @@ export function searchNearby(input: {
   lng: number;
   radiusMeters: number;
   category?: string;
+  describe?: string;
 }) {
   return api.get<NearbyResult[]>(`/search/nearby${qs(input)}`);
 }
@@ -25,6 +26,7 @@ export function searchAddress(input: {
   address?: string;
   radiusMeters: number;
   category?: string;
+  describe?: string;
   language?: string;
 }) {
   return api.get<NearbyResult[]>(`/search/address${qs(input)}`);
@@ -37,6 +39,7 @@ export function searchLocation(input: {
   query?: string;
   radiusMeters: number;
   category?: string;
+  describe?: string;
   language?: string;
 }) {
   return api.get<NearbyResult[]>(`/search/location${qs(input)}`);

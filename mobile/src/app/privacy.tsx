@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { safeBack } from "../lib/navigation";
 import { PageBackground } from "../components/PageBackground";
-import { updatePrivacy } from "../api/profiles";
+import { updatePrivacy, updateAccessGrants } from "../api/profiles";
 import type { Profile } from "../types";
 
 type MessagePrivacy = Profile["messagePrivacy"];
@@ -15,6 +15,31 @@ const OPTIONS: { key: MessagePrivacy; label: string; description: string }[] = [
   { key: "everyone", label: "Everyone", description: "Any WAY user can start a conversation with you." },
   { key: "following", label: "Only people I follow", description: "Only profiles you already follow can message you." },
   { key: "no_one", label: "No one", description: "Nobody can start a new conversation with you." },
+];
+
+// Each enabled flag independently unlocks full profile access for an
+// accepted connector matching it (OR'd together, not AND'd) — see
+// backend/src/lib/profileAccess.ts. Grouped into two rows of chips here
+// since they're conceptually two separate questions ("how they found you"
+// vs. "what kind of profile they are"), not one flat list.
+type AccessGrantKey =
+  | "autoGrantAccessViaNearby"
+  | "autoGrantAccessViaAddress"
+  | "autoGrantAccessViaLocation"
+  | "autoGrantAccessToPersonal"
+  | "autoGrantAccessToBusiness"
+  | "autoGrantAccessToPodcast";
+
+const VIA_GRANTS: { key: AccessGrantKey; label: string }[] = [
+  { key: "autoGrantAccessViaNearby", label: "Nearby" },
+  { key: "autoGrantAccessViaAddress", label: "Address" },
+  { key: "autoGrantAccessViaLocation", label: "Location" },
+];
+
+const KIND_GRANTS: { key: AccessGrantKey; label: string }[] = [
+  { key: "autoGrantAccessToPersonal", label: "Personal" },
+  { key: "autoGrantAccessToBusiness", label: "Business" },
+  { key: "autoGrantAccessToPodcast", label: "Podcast" },
 ];
 
 export default function PrivacyScreen() {
@@ -35,6 +60,11 @@ export default function PrivacyScreen() {
     }
   }
 
+  async function toggleGrant(key: AccessGrantKey, next: boolean) {
+    await updateAccessGrants(activeProfile!.id, { [key]: next } as Partial<Profile>);
+    await refreshProfiles();
+  }
+
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
       <PageBackground />
@@ -46,6 +76,7 @@ export default function PrivacyScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.sectionLabel}>Who can message you</Text>
       {OPTIONS.map((opt) => {
         const active = activeProfile.messagePrivacy === opt.key;
@@ -60,6 +91,30 @@ export default function PrivacyScreen() {
         );
       })}
       {saving && <Text style={styles.savingHint}>Saving…</Text>}
+
+      <Text style={[styles.sectionLabel, styles.secondSectionLabel]}>
+        Who gets full profile access when they connect
+      </Text>
+      <Text style={styles.sectionHint}>
+        Applies only to people you&apos;ve already connected with — never to strangers.
+      </Text>
+
+      <Text style={styles.groupLabel}>Via how they found you</Text>
+      {VIA_GRANTS.map((grant) => (
+        <View key={grant.key} style={styles.row}>
+          <Text style={styles.rowLabel}>{grant.label}</Text>
+          <Switch value={activeProfile[grant.key] ?? false} onValueChange={(next) => toggleGrant(grant.key, next)} />
+        </View>
+      ))}
+
+      <Text style={styles.groupLabel}>Via their profile type</Text>
+      {KIND_GRANTS.map((grant) => (
+        <View key={grant.key} style={styles.row}>
+          <Text style={styles.rowLabel}>{grant.label}</Text>
+          <Switch value={activeProfile[grant.key] ?? false} onValueChange={(next) => toggleGrant(grant.key, next)} />
+        </View>
+      ))}
+      </ScrollView>
     </View>
   );
 }
@@ -73,6 +128,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   headerTitle: { ...typography.h3, color: colors.textPrimary },
+  scrollContent: { paddingBottom: spacing.xl },
   sectionLabel: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -96,4 +152,17 @@ const styles = StyleSheet.create({
   optionDescription: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   optionDescriptionActive: { color: colors.textOnPrimary },
   savingHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  secondSectionLabel: { marginTop: spacing.xl },
+  sectionHint: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.md },
+  groupLabel: { ...typography.body, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing.xs, marginTop: spacing.sm },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  rowLabel: { ...typography.body, color: colors.textPrimary },
 });

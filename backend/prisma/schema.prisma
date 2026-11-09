@@ -102,6 +102,24 @@ model Profile {
   visibilityText     String?
   visibilityImageUrl String?
 
+  // Short, optional "what you do/offer/are into" teaser shown alongside the
+  // mini-profile card and used as search-matchable free text (see
+  // lib/describeMatch.ts) — separate from visibilityText, which is a
+  // purely decorative caption, not search data.
+  whichWay String?
+
+  // Auto-grant-full-profile-access rules (feature: profile access), evaluated
+  // only for an *accepted* connector (see lib/profileAccess.ts) — never for a
+  // stranger who hasn't connected. Each group is independent and OR'd
+  // together: access is granted if the connector matched via EITHER how they
+  // found you OR what kind of profile they are, not both at once.
+  autoGrantAccessViaNearby   Boolean @default(false)
+  autoGrantAccessViaAddress  Boolean @default(false)
+  autoGrantAccessViaLocation Boolean @default(false)
+  autoGrantAccessToPersonal  Boolean @default(false)
+  autoGrantAccessToBusiness  Boolean @default(false)
+  autoGrantAccessToPodcast   Boolean @default(false)
+
   // Who can start a new DM with this profile (routes/messages.ts's
   // POST /conversations). Only gates brand-new conversations — an existing
   // thread is never retroactively locked out by a later privacy change.
@@ -120,6 +138,7 @@ model Profile {
   notifyLive            Boolean @default(true)
   notifyWayRequests     Boolean @default(true)
   notifyCameraRequests  Boolean @default(true)
+  notifyProfileAccessRequests Boolean @default(true)
 
   // Location (feature 5): a profile's displayed location can be overridden to
   // anywhere on earth; actualLat/actualLng always hold the real device location.
@@ -242,6 +261,30 @@ model WayRequest {
   status         String    @default("pending") // pending | accepted | declined
   createdAt      DateTime  @default(now())
   respondedAt    DateTime?
+
+  // The search mode the sender found the recipient through (set by the
+  // mobile client at send time) — "nearby" | "address" | "location" |
+  // "wayid" | "all", or null for a sender that didn't come from search
+  // (e.g. scanning a QR code). Drives Profile.autoGrantAccessVia* once this
+  // request is accepted; see lib/profileAccess.ts.
+  discoveredVia String?
+
+  @@index([fromProfileId])
+  @@index([toProfileId, status])
+}
+
+// A request to escalate from "restricted" to "full" access on someone's
+// profile page (see lib/profileAccess.ts) — distinct from WayRequest
+// ("Connect"), which is the underlying connection itself. Shaped identically
+// to WayRequest/RemoteCameraRequest's status convention.
+model ProfileAccessRequest {
+  id            String    @id @default(cuid())
+  fromProfileId String
+  toProfileId   String
+  message       String?
+  status        String    @default("pending") // pending | accepted | declined
+  createdAt     DateTime  @default(now())
+  respondedAt   DateTime?
 
   @@index([fromProfileId])
   @@index([toProfileId, status])
@@ -528,7 +571,7 @@ model Block {
   id              String   @id @default(cuid())
   actorProfileId  String
   targetProfileId String
-  type            String // "block" | "mute"
+  type            String // "block" | "mute" | "access_request" (narrow, one-directional: only suppresses new ProfileAccessRequests, see lib/blocking.ts's isAccessRequestBlocked)
   createdAt       DateTime @default(now())
 
   @@unique([actorProfileId, targetProfileId, type])
@@ -577,10 +620,11 @@ model Status {
 model Notification {
   id             String   @id @default(cuid())
   profileId      String // recipient
-  type           String // "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live"
+  type           String // "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live" | "profile_access_request" | "profile_access_response"
   actorProfileId String?
   postId         String?
   episodeId      String?
+  profileAccessRequestId String?
   read           Boolean  @default(false)
   createdAt      DateTime @default(now())
 

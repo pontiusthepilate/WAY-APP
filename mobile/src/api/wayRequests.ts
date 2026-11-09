@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { WayRequest } from "../types";
+import type { SearchMode, WayRequest } from "../types";
 
 export function sendWayRequest(input: {
   fromProfileId: string;
@@ -7,6 +7,7 @@ export function sendWayRequest(input: {
   text?: string;
   mediaUrl?: string;
   mediaType?: "image" | "video";
+  discoveredVia?: SearchMode;
 }) {
   return api.post<WayRequest>("/way-requests", input);
 }

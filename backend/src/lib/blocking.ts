@@ -42,3 +42,15 @@ export async function isBlockedEitherWay(profileAId: string, profileBId: string)
   });
   return !!block;
 }
+
+// Narrow and one-directional, unlike isBlockedEitherWay: true only if OWNER
+// has specifically blocked REQUESTER from sending another
+// ProfileAccessRequest (Block.type "access_request"). A requester blocked
+// this way can still message/WayRequest/be found in search as normal — this
+// only gates new access-request creation (routes/profileAccessRequests.ts).
+export async function isAccessRequestBlocked(ownerProfileId: string, requesterProfileId: string): Promise<boolean> {
+  const block = await prisma.block.findFirst({
+    where: { actorProfileId: ownerProfileId, targetProfileId: requesterProfileId, type: "access_request" },
+  });
+  return !!block;
+}

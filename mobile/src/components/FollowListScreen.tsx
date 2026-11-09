@@ -49,6 +49,7 @@ export function FollowListScreen({ profileId, mode }: Props) {
       displayName: entry.displayName,
       displayPictureUrl: entry.displayPictureUrl,
       categories: [],
+      whichWay: null,
       visibilityText: null,
       visibilityImageUrl: null,
       isLocationOverridden: false,
@@ -104,6 +105,7 @@ export function FollowListScreen({ profileId, mode }: Props) {
         onSendRequest={(r) => router.push({ pathname: "/way-request", params: { toWayId: r.wayId, toDisplayName: r.displayName } })}
         onRequestCamera={(r) => router.push({ pathname: "/request-camera", params: { toWayId: r.wayId, toDisplayName: r.displayName } })}
         onMessage={handleMessage}
+        onViewProfile={(r) => router.push({ pathname: "/profile/[id]", params: { id: r.id } })}
         onOpenProfile={setSelected}
       />
     </View>

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Profile } from "../types";
+import type { Profile, ProfileViewResult } from "../types";
 
 export function myProfiles() {
   return api.get<Profile[]>("/profiles/me");
@@ -19,8 +19,36 @@ export function createProfile(input: {
   return api.post<Profile>("/profiles", input);
 }
 
-export function updateProfile(id: string, input: Partial<Pick<Profile, "displayName" | "displayPictureUrl" | "bio" | "categories">>) {
+export function updateProfile(
+  id: string,
+  input: Partial<Pick<Profile, "displayName" | "displayPictureUrl" | "bio" | "whichWay" | "categories">>
+) {
   return api.patch<Profile>(`/profiles/${id}`, input);
+}
+
+// The gated full-profile fetch (feature: profile access) — distinct from
+// getProfileByWayId above, which stays public/unrestricted for the
+// existing mini-profile modal. Returns either the full row or a restricted
+// subset depending on the viewer's computed access level.
+export function getProfileView(id: string, viewerProfileId: string) {
+  return api.get<ProfileViewResult>(`/profiles/${id}?viewerProfileId=${encodeURIComponent(viewerProfileId)}`);
+}
+
+export function updateAccessGrants(
+  id: string,
+  input: Partial<
+    Pick<
+      Profile,
+      | "autoGrantAccessViaNearby"
+      | "autoGrantAccessViaAddress"
+      | "autoGrantAccessViaLocation"
+      | "autoGrantAccessToPersonal"
+      | "autoGrantAccessToBusiness"
+      | "autoGrantAccessToPodcast"
+    >
+  >
+) {
+  return api.patch<Profile>(`/profiles/${id}/access-grants`, input);
 }
 
 export function setPrimaryProfile(id: string) {

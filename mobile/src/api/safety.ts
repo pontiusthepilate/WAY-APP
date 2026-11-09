@@ -1,7 +1,7 @@
 import { api } from "./client";
 import type { ProfileSummary } from "../types";
 
-export type BlockType = "block" | "mute";
+export type BlockType = "block" | "mute" | "access_request";
 export type ReportTargetType = "profile" | "post" | "comment";
 
 export interface Block {

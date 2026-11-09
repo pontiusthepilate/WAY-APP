@@ -12,6 +12,7 @@ import { userRoutes } from "./routes/users";
 import { profileRoutes } from "./routes/profiles";
 import { searchRoutes } from "./routes/search";
 import { wayRequestRoutes } from "./routes/wayRequests";
+import { profileAccessRequestRoutes } from "./routes/profileAccessRequests";
 import { postRoutes } from "./routes/posts";
 import { uploadRoutes } from "./routes/uploads";
 import { walletRoutes } from "./routes/wallet";
@@ -99,6 +100,7 @@ async function main() {
   await app.register(profileRoutes);
   await app.register(searchRoutes);
   await app.register(wayRequestRoutes);
+  await app.register(profileAccessRequestRoutes);
   await app.register(postRoutes);
   await app.register(uploadRoutes);
   await app.register(walletRoutes);

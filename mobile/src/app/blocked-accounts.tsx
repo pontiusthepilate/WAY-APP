@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,21 +14,24 @@ export default function BlockedAccountsScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useSession();
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [accessBlocks, setAccessBlocks] = useState<Block[]>([]);
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!activeProfile) return;
     getMyBlocks(activeProfile.id, "block").then(setBlocks).catch(() => {});
+    getMyBlocks(activeProfile.id, "access_request").then(setAccessBlocks).catch(() => {});
   }, [activeProfile]);
 
   useFocusEffect(load);
 
-  async function handleUnblock(targetProfileId: string) {
+  async function handleUnblock(targetProfileId: string, type: "block" | "access_request") {
     if (!activeProfile) return;
     setUnblockingId(targetProfileId);
     try {
-      await removeBlock(activeProfile.id, targetProfileId, "block");
-      setBlocks((prev) => prev.filter((b) => b.targetProfileId !== targetProfileId));
+      await removeBlock(activeProfile.id, targetProfileId, type);
+      if (type === "block") setBlocks((prev) => prev.filter((b) => b.targetProfileId !== targetProfileId));
+      else setAccessBlocks((prev) => prev.filter((b) => b.targetProfileId !== targetProfileId));
     } finally {
       setUnblockingId(null);
     }
@@ -45,11 +48,15 @@ export default function BlockedAccountsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <FlatList
-        data={blocks}
+      <SectionList
+        sections={[
+          { title: "Blocked", type: "block" as const, data: blocks },
+          { title: "Blocked from requesting profile access", type: "access_request" as const, data: accessBlocks },
+        ].filter((s) => s.data.length > 0)}
         keyExtractor={(b) => b.id}
         contentContainerStyle={styles.listPadding}
-        renderItem={({ item }) => (
+        renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
+        renderItem={({ item, section }) => (
           <View style={styles.row}>
             <Avatar uri={item.targetProfile?.displayPictureUrl ?? null} displayName={item.targetProfile?.displayName ?? "?"} size={44} />
             <View style={styles.rowBody}>
@@ -58,7 +65,7 @@ export default function BlockedAccountsScreen() {
             </View>
             <Pressable
               style={styles.unblockButton}
-              onPress={() => handleUnblock(item.targetProfileId)}
+              onPress={() => handleUnblock(item.targetProfileId, section.type)}
               disabled={unblockingId === item.targetProfileId}
             >
               <Text style={styles.unblockButtonText}>Unblock</Text>
@@ -81,6 +88,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...typography.h3, color: colors.textPrimary },
   listPadding: { paddingTop: spacing.sm },
+  sectionHeader: { ...typography.caption, color: colors.textSecondary, textTransform: "uppercase", marginBottom: spacing.xs, marginTop: spacing.sm },
   row: {
     flexDirection: "row",
     alignItems: "center",

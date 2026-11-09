@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Pressable,
@@ -39,6 +40,7 @@ import { useSearchLanguage } from "../../lib/useLocale";
 import { startConversation } from "../../api/messages";
 import { updateVisibility } from "../../api/profiles";
 import { getActiveStatusIds } from "../../api/status";
+import { getHasSeenAccessGrantNudge, markAccessGrantNudgeSeen } from "../../lib/accessGrantNudge";
 import type { NearbyResult, ResultView, SearchMode, UnifiedSearchResults } from "../../types";
 import { ApiError } from "../../api/client";
 
@@ -177,12 +179,13 @@ export default function SearchScreen() {
   // search immediately instead of waiting for `category` state to
   // re-render — picking a category then has to feel like it "just runs
   // the search", not require a separate tap on the Search button.
-  // Guarded with a typeof check since onSubmitEditing wires this same
-  // function straight to TextInput, which calls it with a native event
-  // object, not a string.
-  const runSearch = useCallback(async (categoryOverride?: string) => {
+  // describeOverride is the free-text "search people matching this
+  // description" variant from the same sheet. Every call site wraps this
+  // in an arrow function (never passed directly as a callback prop), so
+  // no event-object guard is needed here.
+  const runSearch = useCallback(async (categoryOverride?: string, describeOverride?: string) => {
     if (!activeProfile) return;
-    const cat = typeof categoryOverride === "string" ? categoryOverride : category;
+    const cat = categoryOverride ?? category;
     setLoading(true);
     setError(null);
     try {
@@ -193,7 +196,13 @@ export default function SearchScreen() {
           setError("Turn on location access to search nearby.");
           return;
         }
-        next = await searchNearby({ profileId: activeProfile.id, radiusMeters, category: cat || undefined, ...point });
+        next = await searchNearby({
+          profileId: activeProfile.id,
+          radiusMeters,
+          category: cat || undefined,
+          describe: describeOverride,
+          ...point,
+        });
       } else if (mode === "address") {
         if (!addressText.trim()) {
           setError("Enter a street address to search.");
@@ -204,6 +213,7 @@ export default function SearchScreen() {
           ...(addressCoords ?? { address: addressText.trim() }),
           radiusMeters,
           category: cat || undefined,
+          describe: describeOverride,
           language,
         });
       } else if (mode === "location") {
@@ -216,6 +226,7 @@ export default function SearchScreen() {
           ...(locationCoords ?? { query: locationText.trim() }),
           radiusMeters,
           category: cat || undefined,
+          describe: describeOverride,
           language,
         });
       } else if (mode === "wayid") {
@@ -371,10 +382,27 @@ export default function SearchScreen() {
     if (!activeProfile) return;
     await updateVisibility(activeProfile.id, { isVisible: next });
     await refreshProfiles();
+    // One-time nudge toward the full-profile-access settings, right at the
+    // point the user suggested — switching visibility on — rather than a
+    // new sheet. Only fires once per install and only when turning ON.
+    if (next && !(await getHasSeenAccessGrantNudge())) {
+      await markAccessGrantNudgeSeen();
+      Alert.alert("Full profile access", "Choose who can see your full profile once they connect.", [
+        { text: "Not now" },
+        { text: "Go to Privacy", onPress: () => router.push("/privacy") },
+      ]);
+    }
   }
 
   function openRequest(result: NearbyResult) {
-    router.push({ pathname: "/way-request", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
+    router.push({
+      pathname: "/way-request",
+      params: { toWayId: result.wayId, toDisplayName: result.displayName, discoveredVia: mode },
+    });
+  }
+
+  function openViewProfile(result: NearbyResult) {
+    router.push({ pathname: "/profile/[id]", params: { id: result.id, discoveredVia: mode } });
   }
 
   function openCameraRequest(result: NearbyResult) {
@@ -440,7 +468,7 @@ export default function SearchScreen() {
                   setAddressText(text);
                   setAddressCoords(null);
                 }}
-                onSubmitEditing={runSearch}
+                onSubmitEditing={() => runSearch()}
               />
               <Pressable onPress={() => setMapPickerMode("address")} hitSlop={8} accessibilityLabel="Pick on map">
                 <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
@@ -466,7 +494,7 @@ export default function SearchScreen() {
                   setLocationText(text);
                   setLocationCoords(null);
                 }}
-                onSubmitEditing={runSearch}
+                onSubmitEditing={() => runSearch()}
               />
               <Pressable onPress={() => setMapPickerMode("location")} hitSlop={8} accessibilityLabel="Pick on map">
                 <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
@@ -488,7 +516,7 @@ export default function SearchScreen() {
               placeholderTextColor={colors.textSecondary}
               value={allQueryText}
               onChangeText={setAllQueryText}
-              onSubmitEditing={runSearch}
+              onSubmitEditing={() => runSearch()}
             />
           </View>
         )}
@@ -510,7 +538,7 @@ export default function SearchScreen() {
                 autoCapitalize="none"
                 value={wayIdText}
                 onChangeText={setWayIdText}
-                onSubmitEditing={runSearch}
+                onSubmitEditing={() => runSearch()}
               />
             </View>
             <CountryPickerSheet
@@ -538,6 +566,10 @@ export default function SearchScreen() {
                 setCategoryPickerOpen(false);
                 runSearch(name);
               }}
+              onDescribe={(text) => {
+                setCategoryPickerOpen(false);
+                runSearch(undefined, text);
+              }}
             />
           </>
         )}
@@ -547,7 +579,7 @@ export default function SearchScreen() {
         {mode !== "nearby" && (
           <View style={styles.searchRow}>
             <DotOutline radius={radii.pill} tone="onDark" style={styles.searchButtonWrap}>
-              <Pressable style={styles.searchButton} onPress={runSearch}>
+              <Pressable style={styles.searchButton} onPress={() => runSearch()}>
                 <Text style={styles.searchButtonText}>Search</Text>
                 <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
               </Pressable>
@@ -653,6 +685,7 @@ export default function SearchScreen() {
         onSendRequest={openRequest}
         onRequestCamera={openCameraRequest}
         onMessage={openMessage}
+        onViewProfile={openViewProfile}
         onOpenProfile={setSelected}
       />
 

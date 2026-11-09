@@ -26,6 +26,11 @@ interface SheetProps {
   open: boolean;
   onClose: () => void;
   onSelect: (name: string) => void;
+  // Runs a free-text profile search (matching against real profiles'
+  // Which Way text, see lib/describeMatch.ts server-side) instead of
+  // picking an exact taxonomy tag — a visibly distinct action from
+  // selecting one of the "Suggested for you" category matches below it.
+  onDescribe?: (query: string) => void;
 }
 
 interface Section {
@@ -83,7 +88,7 @@ function SuggestCategoryRow({ query }: { query: string }) {
 // search-while-browsing pattern), with a "Clear" row up top since this
 // field is optional and a picker (unlike a text field) needs an explicit
 // way to go back to "no category".
-export function CategoryPickerSheet({ open, onClose, onSelect }: SheetProps) {
+export function CategoryPickerSheet({ open, onClose, onSelect, onDescribe }: SheetProps) {
   const [query, setQuery] = useState("");
 
   const directSections = useMemo(() => {
@@ -119,6 +124,13 @@ export function CategoryPickerSheet({ open, onClose, onSelect }: SheetProps) {
     onClose();
   }
 
+  function handleDescribe() {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    onDescribe?.(trimmed);
+    setQuery("");
+  }
+
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={handleClose}>
       <Pressable style={styles.backdrop} onPress={handleClose} />
@@ -144,6 +156,13 @@ export function CategoryPickerSheet({ open, onClose, onSelect }: SheetProps) {
           <Ionicons name="close-circle-outline" size={18} color={colors.textSecondary} />
           <Text style={styles.clearText}>Clear category</Text>
         </Pressable>
+
+        {onDescribe && suggestedSections.length > 0 && (
+          <Pressable style={styles.describeRow} onPress={handleDescribe}>
+            <Ionicons name="people-outline" size={18} color={colors.primary} />
+            <Text style={styles.describeText}>Search people matching this description</Text>
+          </Pressable>
+        )}
 
         <SectionList
           sections={sections}
@@ -332,6 +351,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   clearText: { ...typography.body, color: colors.textSecondary, fontWeight: "600" },
+  describeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  describeText: { ...typography.body, color: colors.primary, fontWeight: "600" },
   list: { flex: 1 },
   sectionHeader: { backgroundColor: colors.surface, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   sectionHeaderText: { ...typography.caption, color: colors.primaryDark, fontWeight: "700", textTransform: "uppercase" },

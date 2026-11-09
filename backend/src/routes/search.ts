@@ -5,6 +5,7 @@ import { findNearbyProfiles } from "../lib/geo";
 import { geocodeAddress, GeocodeConfigError } from "../lib/geocode";
 import { normalizeWayId } from "../lib/wayId";
 import { getSuppressedProfileIds } from "../lib/blocking";
+import { significantWords } from "../lib/describeMatch";
 
 // Config/outage errors are logged with the real reason but never shown to
 // the end user verbatim; a bad address gets its own (already friendly) message.
@@ -25,6 +26,10 @@ const nearbyQuery = z.object({
   lng: z.coerce.number().min(-180).max(180),
   radiusMeters: z.coerce.number().positive().max(MAX_RADIUS_METERS).default(DEFAULT_RADIUS_METERS),
   category: z.string().optional(),
+  // Free-text "describe what you're looking for" query, matched against
+  // whichWay via findNearbyProfiles' describeWords (see lib/describeMatch.ts)
+  // — independent of `category`, a result can match via either.
+  describe: z.string().optional(),
 });
 
 // ADDRESS accepts either a client-resolved lat/lng (the mobile app already
@@ -39,6 +44,7 @@ const addressQuery = z
     address: z.string().min(3).optional(),
     radiusMeters: z.coerce.number().positive().max(MAX_RADIUS_METERS).default(DEFAULT_RADIUS_METERS),
     category: z.string().optional(),
+    describe: z.string().optional(),
     language: z.string().optional(),
   })
   .refine((v) => (v.lat !== undefined && v.lng !== undefined) || v.address, {
@@ -56,6 +62,7 @@ const locationQuery = z
     query: z.string().min(2).optional(),
     radiusMeters: z.coerce.number().positive().max(MAX_RADIUS_METERS).default(DEFAULT_RADIUS_METERS),
     category: z.string().optional(),
+    describe: z.string().optional(),
     language: z.string().optional(),
   })
   .refine((v) => (v.lat !== undefined && v.lng !== undefined) || v.query, {
@@ -84,6 +91,7 @@ const LOOKUP_SELECT = {
   displayName: true,
   displayPictureUrl: true,
   categories: true,
+  whichWay: true,
   visibilityText: true,
   visibilityImageUrl: true,
   isLocationOverridden: true,
@@ -106,6 +114,7 @@ export async function searchRoutes(app: FastifyInstance) {
       lng: q.lng,
       radiusMeters: q.radiusMeters,
       category: q.category,
+      describeWords: q.describe ? significantWords(q.describe) : undefined,
       excludeProfileId: q.profileId,
       excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToNearby",
@@ -137,6 +146,7 @@ export async function searchRoutes(app: FastifyInstance) {
       lng: lng!,
       radiusMeters: q.radiusMeters,
       category: q.category,
+      describeWords: q.describe ? significantWords(q.describe) : undefined,
       excludeProfileId: q.profileId,
       excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToAddress",
@@ -166,6 +176,7 @@ export async function searchRoutes(app: FastifyInstance) {
       lng: lng!,
       radiusMeters: q.radiusMeters,
       category: q.category,
+      describeWords: q.describe ? significantWords(q.describe) : undefined,
       excludeProfileId: q.profileId,
       excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToLocation",

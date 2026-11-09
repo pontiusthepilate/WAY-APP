@@ -12,6 +12,9 @@ const createRequestBody = z.object({
   text: z.string().max(500).optional(),
   mediaUrl: z.string().url().optional(),
   mediaType: z.enum(["image", "video"]).optional(),
+  // Which search mode the sender found the recipient through (feature:
+  // profile access) — drives Profile.autoGrantAccessVia* once accepted.
+  discoveredVia: z.enum(["nearby", "address", "location", "wayid", "all"]).optional(),
 });
 const respondBody = z.object({ profileId: z.string() });
 
@@ -47,6 +50,7 @@ export async function wayRequestRoutes(app: FastifyInstance) {
         text: body.text,
         mediaUrl: body.mediaUrl,
         mediaType: body.mediaType,
+        discoveredVia: body.discoveredVia,
       },
     });
 

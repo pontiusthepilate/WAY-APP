@@ -5,6 +5,10 @@ export interface Profile {
   displayName: string;
   displayPictureUrl: string | null;
   bio: string | null;
+  // Short, optional "what you do/offer/are into" teaser — shown wherever a
+  // profile is previewed and used as search-matchable free text (see
+  // the category picker's "Search people matching this description").
+  whichWay: string | null;
   categories: string[];
   kind: "personal" | "business" | "podcast";
   isVerified: boolean;
@@ -24,6 +28,17 @@ export interface Profile {
   visibleToLocation: boolean;
   visibilityText: string | null;
   visibilityImageUrl: string | null;
+
+  // Auto-grant-full-profile-access rules (feature: profile access) —
+  // evaluated only for an accepted connector, see profileAccess docs on
+  // the backend. Each group is independent and OR'd together.
+  autoGrantAccessViaNearby: boolean;
+  autoGrantAccessViaAddress: boolean;
+  autoGrantAccessViaLocation: boolean;
+  autoGrantAccessToPersonal: boolean;
+  autoGrantAccessToBusiness: boolean;
+  autoGrantAccessToPodcast: boolean;
+
   messagePrivacy: "everyone" | "following" | "no_one";
   notifyLikes: boolean;
   notifyComments: boolean;
@@ -33,6 +48,7 @@ export interface Profile {
   notifyLive: boolean;
   notifyWayRequests: boolean;
   notifyCameraRequests: boolean;
+  notifyProfileAccessRequests: boolean;
   actualLat: number | null;
   actualLng: number | null;
   displayLat: number | null;
@@ -58,6 +74,7 @@ export interface NearbyResult {
   displayName: string;
   displayPictureUrl: string | null;
   categories: string[];
+  whichWay: string | null;
   visibilityText: string | null;
   visibilityImageUrl: string | null;
   isLocationOverridden: boolean;
@@ -69,6 +86,30 @@ export interface NearbyResult {
 
 export type SearchMode = "nearby" | "address" | "location" | "wayid" | "all";
 export type ResultView = "radar" | "list" | "grid";
+
+export type ProfileAccessLevel = "full" | "restricted";
+
+// The fixed field subset shown when accessLevel is "restricted" — the same
+// fields MiniProfileModal already shows to anyone (see profile/[id].tsx).
+export interface RestrictedProfileView {
+  id: string;
+  wayId: string;
+  displayName: string;
+  displayPictureUrl: string | null;
+  kind: "personal" | "business" | "podcast";
+  isVerified: boolean;
+  categories: string[];
+  whichWay: string | null;
+  visibilityText: string | null;
+  visibilityImageUrl: string | null;
+  isDefault: boolean;
+  defaultLabel: string | null;
+}
+
+export interface ProfileViewResult {
+  accessLevel: ProfileAccessLevel;
+  profile: Profile | RestrictedProfileView;
+}
 
 // A unified-search result additionally carries its profile kind, to group
 // and label people/businesses/podcasts together in one response.
@@ -247,7 +288,28 @@ export interface WayRequest {
   text: string | null;
   mediaUrl: string | null;
   mediaType: "image" | "video" | null;
+  // Which search mode the sender found the recipient through — drives
+  // Profile.autoGrantAccessVia* once this request is accepted; null for a
+  // sender that didn't come from search (e.g. scanning a QR code).
+  discoveredVia: SearchMode | null;
   status: WayRequestStatus;
+  createdAt: string;
+  respondedAt: string | null;
+}
+
+export type ProfileAccessRequestStatus = "pending" | "accepted" | "declined";
+
+// Distinct from WayRequest ("Connect") — the escalation sent when the
+// mini-profile/restricted view isn't enough and the viewer wants the owner
+// to grant full profile access directly (see profile-access-request.tsx).
+export interface ProfileAccessRequest {
+  id: string;
+  fromProfileId: string;
+  toProfileId: string;
+  fromProfile: ProfileSummary | null;
+  toProfile: ProfileSummary | null;
+  message: string | null;
+  status: ProfileAccessRequestStatus;
   createdAt: string;
   respondedAt: string | null;
 }
@@ -299,7 +361,15 @@ export interface Call {
   endedAt: string | null;
 }
 
-export type NotificationType = "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live";
+export type NotificationType =
+  | "like"
+  | "comment"
+  | "follow"
+  | "way_request"
+  | "camera_request"
+  | "go_live"
+  | "profile_access_request"
+  | "profile_access_response";
 
 export interface AppNotification {
   id: string;
@@ -309,6 +379,7 @@ export interface AppNotification {
   actor: ProfileSummary | null;
   postId: string | null;
   episodeId: string | null;
+  profileAccessRequestId: string | null;
   read: boolean;
   createdAt: string;
 }

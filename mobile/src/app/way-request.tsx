@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { sendWayRequest } from "../api/wayRequests";
+import type { SearchMode } from "../types";
 import { uploadMedia } from "../api/uploads";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
@@ -16,7 +17,11 @@ import { DotOutline } from "../components/DotOutline";
 const MAX_VIDEO_SECONDS = 5;
 
 export default function WayRequestScreen() {
-  const { toWayId, toDisplayName } = useLocalSearchParams<{ toWayId: string; toDisplayName: string }>();
+  const { toWayId, toDisplayName, discoveredVia } = useLocalSearchParams<{
+    toWayId: string;
+    toDisplayName: string;
+    discoveredVia?: SearchMode;
+  }>();
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
 
@@ -62,6 +67,7 @@ export default function WayRequestScreen() {
         text: text.trim() || undefined,
         mediaUrl: uploaded?.url,
         mediaType: uploaded?.mediaType,
+        discoveredVia,
       });
       setSent(true);
     } catch (err) {

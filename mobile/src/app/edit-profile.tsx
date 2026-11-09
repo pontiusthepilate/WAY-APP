@@ -13,6 +13,7 @@ import { safeBack } from "../lib/navigation";
 // Mirrors backend/src/routes/profiles.ts's updateProfileBody limits.
 const DISPLAY_NAME_MAX_LENGTH = 40;
 const BIO_MAX_LENGTH = 280;
+const WHICH_WAY_MAX_LENGTH = 150;
 const CATEGORIES_MAX = 10;
 
 export default function EditProfileScreen() {
@@ -20,6 +21,7 @@ export default function EditProfileScreen() {
   const { activeProfile, refreshProfiles } = useSession();
   const [displayName, setDisplayName] = useState(activeProfile?.displayName ?? "");
   const [bio, setBio] = useState(activeProfile?.bio ?? "");
+  const [whichWay, setWhichWay] = useState(activeProfile?.whichWay ?? "");
   const [categories, setCategories] = useState<string[]>(activeProfile?.categories ?? []);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,7 @@ export default function EditProfileScreen() {
     }
     setLoading(true);
     try {
-      await updateProfile(activeProfile!.id, { displayName: trimmedName, bio: bio.trim(), categories });
+      await updateProfile(activeProfile!.id, { displayName: trimmedName, bio: bio.trim(), whichWay: whichWay.trim(), categories });
       await refreshProfiles();
       safeBack();
     } catch (err) {
@@ -86,6 +88,19 @@ export default function EditProfileScreen() {
       />
       <Text style={styles.counter}>
         {bio.length}/{BIO_MAX_LENGTH}
+      </Text>
+
+      <Text style={styles.label}>Which Way</Text>
+      <TextInput
+        style={[styles.input, styles.whichWayInput]}
+        value={whichWay}
+        onChangeText={(v) => setWhichWay(v.slice(0, WHICH_WAY_MAX_LENGTH))}
+        placeholder="What do you do, offer, or love? This helps people find you."
+        placeholderTextColor={colors.textSecondary}
+        multiline
+      />
+      <Text style={styles.counter}>
+        {whichWay.length}/{WHICH_WAY_MAX_LENGTH}
       </Text>
 
       <Text style={styles.label}>Interests</Text>
@@ -134,6 +149,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   bioInput: { minHeight: 100, textAlignVertical: "top" },
+  whichWayInput: { minHeight: 60, textAlignVertical: "top" },
   counter: { ...typography.caption, color: colors.textSecondary, textAlign: "right", marginTop: 4 },
   categoryTrigger: {
     flexDirection: "row",

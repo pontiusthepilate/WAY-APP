@@ -25,6 +25,10 @@ interface Props {
   onSendRequest: (result: NearbyResult) => void;
   onRequestCamera: (result: NearbyResult) => void;
   onMessage: (result: NearbyResult) => void;
+  // Opens the new full-profile page (feature: profile access) — available
+  // whether or not the viewer currently has full access; the page itself
+  // renders a restricted or full view depending on that.
+  onViewProfile: (result: NearbyResult) => void;
   // Lets a viewer jump to another of this profile's owner's profiles via the
   // "Also on WAY" row below — the parent just swaps its own selected/found
   // state, same as picking any other search result (profile-kind
@@ -48,7 +52,7 @@ const ANIM_MS = 260;
 // own content-dispatch path on this RN version rather than anything in this
 // component's layout. A plain overlay has no native view-controller
 // boundary for either problem to occur across.
-export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCamera, onMessage, onOpenProfile }: Props) {
+export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCamera, onMessage, onViewProfile, onOpenProfile }: Props) {
   // Kept mounted past `result` going null so the sheet can finish sliding
   // down before it disappears, instead of vanishing mid-animation. Set
   // directly during render (React's own pattern for state derived from a
@@ -228,6 +232,12 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
           </View>
         )}
 
+        {shown.whichWay && (
+          <View style={styles.whichWayBox}>
+            <Text style={styles.whichWayText}>{shown.whichWay}</Text>
+          </View>
+        )}
+
         {!isDefault && (
           <View style={styles.followRow}>
             <FollowButton targetProfileId={shown.id} />
@@ -293,8 +303,11 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
 
         {!isDefault && (
           <>
+            <Pressable style={styles.cameraButton} onPress={() => closeThen(() => onViewProfile(shown))}>
+              <Text style={styles.cameraButtonText}>View Profile</Text>
+            </Pressable>
             <Pressable style={styles.requestButton} onPress={() => closeThen(() => onSendRequest(shown))}>
-              <Text style={styles.requestButtonText}>Send WAY Request</Text>
+              <Text style={styles.requestButtonText}>Connect</Text>
             </Pressable>
             <Pressable style={styles.cameraButton} onPress={() => closeThen(() => onMessage(shown))}>
               <Text style={styles.cameraButtonText}>Message</Text>
@@ -375,6 +388,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   defaultBadgeText: { ...typography.caption, color: colors.primaryDark, fontWeight: "700" },
+  whichWayBox: { marginTop: spacing.sm, paddingHorizontal: spacing.md },
+  whichWayText: { ...typography.body, color: colors.textPrimary, textAlign: "center" },
   followRow: { marginTop: spacing.sm },
   statsRow: { flexDirection: "row", marginTop: spacing.md, gap: spacing.lg },
   stat: { alignItems: "center" },
