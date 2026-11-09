@@ -321,6 +321,21 @@ section { padding: 96px 0; }
 .mode-card h3 { font-size: 19px; margin-bottom: 10px; }
 .mode-card p { color: var(--text-secondary); font-size: 15px; }
 
+/* contact */
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.contact-card { text-align: center; }
+.contact-card .mode-icon { margin-inline: auto; }
+.contact-card a { color: var(--primary); font-weight: 600; }
+.contact-card a:hover { text-decoration: underline; }
+
 /* feature grid */
 
 .features {
@@ -617,7 +632,7 @@ footer {
 @media (max-width: 680px) {
   .nav-links { display: none; }
   .nav-toggle { display: block; }
-  .modes, .feature-grid, .steps { grid-template-columns: 1fr; }
+  .modes, .feature-grid, .steps, .contact-grid { grid-template-columns: 1fr; }
   .hero { padding: 56px 0 100px; }
   section { padding: 64px 0; }
   .cta-band { padding: 48px 24px; }
