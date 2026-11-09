@@ -620,11 +620,12 @@ model Status {
 model Notification {
   id             String   @id @default(cuid())
   profileId      String // recipient
-  type           String // "like" | "comment" | "follow" | "way_request" | "camera_request" | "go_live" | "profile_access_request" | "profile_access_response"
+  type           String // "like" | "comment" | "follow" | "way_request" | "way_request_accepted" | "way_request_declined" | "camera_request" | "go_live" | "profile_access_request" | "profile_access_response"
   actorProfileId String?
   postId         String?
   episodeId      String?
   profileAccessRequestId String?
+  wayRequestId   String?
   read           Boolean  @default(false)
   createdAt      DateTime @default(now())
 

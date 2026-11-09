@@ -366,6 +366,8 @@ export type NotificationType =
   | "comment"
   | "follow"
   | "way_request"
+  | "way_request_accepted"
+  | "way_request_declined"
   | "camera_request"
   | "go_live"
   | "profile_access_request"
@@ -380,6 +382,7 @@ export interface AppNotification {
   postId: string | null;
   episodeId: string | null;
   profileAccessRequestId: string | null;
+  wayRequestId: string | null;
   read: boolean;
   createdAt: string;
 }

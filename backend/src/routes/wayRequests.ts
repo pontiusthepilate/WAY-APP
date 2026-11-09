@@ -61,7 +61,9 @@ export async function wayRequestRoutes(app: FastifyInstance) {
         body.text ?? "Tap to review",
         { wayRequestId: created.id }
       );
-      await prisma.notification.create({ data: { profileId: toProfile.id, type: "way_request", actorProfileId: fromProfile.id } });
+      await prisma.notification.create({
+        data: { profileId: toProfile.id, type: "way_request", actorProfileId: fromProfile.id, wayRequestId: created.id },
+      });
     }
 
     reply.status(201).send(await withSender(created));
@@ -118,8 +120,20 @@ export async function wayRequestRoutes(app: FastifyInstance) {
       data: { status: "accepted", respondedAt: new Date() },
     });
 
+    // Accept/decline confirmations are intentionally ungated by
+    // notifyWayRequests (same precedent as the Notification model's own
+    // doc comment: a direct response to the sender's own action, not
+    // discretionary noise) — unlike the initial request above.
     await notifyProfiles([request.fromProfileId], "WAY request accepted", "They accepted your WAY request", {
       wayRequestId: updated.id,
+    });
+    await prisma.notification.create({
+      data: {
+        profileId: request.fromProfileId,
+        type: "way_request_accepted",
+        actorProfileId: request.toProfileId,
+        wayRequestId: updated.id,
+      },
     });
 
     reply.send(await withSender(updated));
@@ -139,6 +153,22 @@ export async function wayRequestRoutes(app: FastifyInstance) {
       where: { id },
       data: { status: "declined", respondedAt: new Date() },
     });
+
+    // Previously silent — the sender had no way to learn their request was
+    // declined short of checking their outgoing list manually. Ungated, same
+    // as accept above.
+    await notifyProfiles([request.fromProfileId], "WAY request declined", "They declined your WAY request", {
+      wayRequestId: updated.id,
+    });
+    await prisma.notification.create({
+      data: {
+        profileId: request.fromProfileId,
+        type: "way_request_declined",
+        actorProfileId: request.toProfileId,
+        wayRequestId: updated.id,
+      },
+    });
+
     reply.send(await withSender(updated));
   });
 }

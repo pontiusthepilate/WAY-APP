@@ -16,6 +16,8 @@ const MESSAGE_BY_TYPE: Record<NotificationType, (name: string) => string> = {
   comment: (name) => `${name} commented on your post`,
   follow: (name) => `${name} started following you`,
   way_request: (name) => `${name} sent you a WAY request`,
+  way_request_accepted: (name) => `${name} accepted your WAY request`,
+  way_request_declined: (name) => `${name} declined your WAY request`,
   camera_request: (name) => `${name} wants to see your camera`,
   go_live: (name) => `${name} is live now`,
   profile_access_request: (name) => `${name} requested access to your full profile`,
@@ -64,6 +66,7 @@ export default function NotificationsScreen() {
     if (notification.episodeId) router.push(`/episode/${notification.episodeId}`);
     else if (notification.postId) router.push(`/post/${notification.postId}`);
     else if (notification.profileAccessRequestId) router.push(`/profile-access-request/${notification.profileAccessRequestId}`);
+    else if (notification.wayRequestId) router.push(`/way-request/${notification.wayRequestId}`);
   }
 
   async function handleMarkAllRead() {
