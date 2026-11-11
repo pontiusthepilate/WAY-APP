@@ -78,6 +78,13 @@
           "color": "#0A4554"
         }
       ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "WAY needs microphone access to generate live captions during calls.",
+          "speechRecognitionPermission": "WAY needs speech recognition access to generate live captions during calls."
+        }
+      ],
       "@react-native-community/datetimepicker",
       [
         "@livekit/react-native-expo-plugin",

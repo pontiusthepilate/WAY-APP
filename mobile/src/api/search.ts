@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { NearbyResult, UnifiedSearchResults } from "../types";
+import type { NearbyResult, ParsedSearchIntent, UnifiedSearchResults } from "../types";
 
 export function qs(params: Record<string, string | number | undefined>): string {
   const parts = Object.entries(params)
@@ -54,4 +54,10 @@ export function searchByWayId(input: { profileId: string; query: string }) {
 // across every profile kind at once, with no distance filtering.
 export function searchAll(input: { profileId: string; query: string; language?: string }) {
   return api.get<UnifiedSearchResults>(`/search/all${qs(input)}`);
+}
+
+// Parses a natural-language query into the same structured fields the
+// manual search UI already produces — see search.tsx's handling of it.
+export function parseSearchQuery(query: string) {
+  return api.post<ParsedSearchIntent>("/search/parse-query", { query });
 }

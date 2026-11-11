@@ -5,6 +5,7 @@ import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { notifyProfiles } from "../lib/expoPush";
 import { isBlockedEitherWay } from "../lib/blocking";
+import { getConnectRecommendations } from "../lib/recommendations";
 
 const createRequestBody = z.object({
   fromProfileId: z.string(),
@@ -103,6 +104,17 @@ export async function wayRequestRoutes(app: FastifyInstance) {
       orderBy: { createdAt: "desc" },
     });
     return Promise.all(requests.map(withSender));
+  });
+
+  // "People you may want to connect with" — personalized to the viewer's
+  // own categories/location/network, so this is gated like any other
+  // personal-data route (assertOwnsProfile), not public like followers.
+  // See lib/recommendations.ts for the scoring.
+  app.get("/way-requests/recommendations/:profileId", { onRequest: [app.authenticate] }, async (req) => {
+    const { userId } = requireUser(req);
+    const { profileId } = req.params as { profileId: string };
+    await assertOwnsProfile(userId, profileId);
+    return getConnectRecommendations(profileId);
   });
 
   app.post("/way-requests/:id/accept", { onRequest: [app.authenticate] }, async (req, reply) => {

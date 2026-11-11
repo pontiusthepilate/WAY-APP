@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { notifyProfiles } from "../lib/expoPush";
+import { textViolatesPolicy, REJECTED_CONTENT_ERROR } from "../lib/moderation";
 
 const createSessionBody = z.object({
   profileId: z.string(),
@@ -167,6 +168,10 @@ export async function liveRoutes(app: FastifyInstance) {
     const session = await prisma.liveSession.findUnique({ where: { id } });
     if (!session) return reply.status(404).send({ error: "Not found" });
     if (session.status !== "live") return reply.status(400).send({ error: "This live session has ended" });
+
+    if (await textViolatesPolicy(body.text)) {
+      return reply.status(422).send(REJECTED_CONTENT_ERROR);
+    }
 
     const message = await prisma.liveChatMessage.create({
       data: { liveSessionId: id, profileId: body.profileId, text: body.text },

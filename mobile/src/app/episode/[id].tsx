@@ -21,7 +21,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import type { useAudioPlayer as UseAudioPlayerType, useAudioPlayerStatus as UseAudioPlayerStatusType } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
-import { addEpisodeComment, getEpisode, getEpisodeComments, registerPlay } from "../../api/episodes";
+import { addEpisodeComment, getEpisode, getEpisodeComments, registerPlay, retryEpisodeTranscription } from "../../api/episodes";
 import { safeBack } from "../../lib/navigation";
 import { Avatar } from "../../components/Avatar";
 import { PodcastVisualizer } from "../../components/PodcastVisualizer";
@@ -47,6 +47,8 @@ export default function EpisodeScreen() {
   const { activeProfile } = useSession();
   const [episode, setEpisode] = useState<Episode | null>(null);
   const [comments, setComments] = useState<EpisodeComment[]>([]);
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const playedRef = useRef(false);
@@ -81,6 +83,17 @@ export default function EpisodeScreen() {
       setEpisode((prev) => (prev ? { ...prev, commentsCount: prev.commentsCount + 1 } : prev));
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleRetryTranscription() {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      const result = await retryEpisodeTranscription(id);
+      setEpisode((prev) => (prev ? { ...prev, transcriptStatus: result.transcriptStatus } : prev));
+    } finally {
+      setRetrying(false);
     }
   }
 
@@ -122,6 +135,38 @@ export default function EpisodeScreen() {
             <View style={styles.actionRowWrap}>
               <EpisodeActionRow episode={episode} onChange={setEpisode} />
             </View>
+
+            {episode.showNotes && (
+              <View style={styles.showNotesWrap}>
+                <Text style={styles.sectionLabel}>Show Notes</Text>
+                <Text style={styles.showNotesText}>{episode.showNotes}</Text>
+              </View>
+            )}
+
+            {episode.transcriptStatus === "pending" && (
+              <Text style={[styles.transcriptStatusText, styles.transcriptStatusPadded]}>Transcribing…</Text>
+            )}
+
+            {episode.transcriptStatus === "failed" && (
+              <View style={styles.transcriptStatusRow}>
+                <Text style={styles.transcriptStatusText}>Transcript unavailable</Text>
+                {activeProfile?.id === episode.profileId && (
+                  <Pressable onPress={handleRetryTranscription} disabled={retrying} hitSlop={8}>
+                    <Text style={styles.retryLink}>{retrying ? "Retrying…" : "Retry"}</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {episode.transcript && (
+              <View style={styles.transcriptWrap}>
+                <Pressable onPress={() => setTranscriptExpanded((v) => !v)} style={styles.transcriptHeaderRow}>
+                  <Text style={styles.sectionLabel}>Transcript</Text>
+                  <Ionicons name={transcriptExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
+                </Pressable>
+                {transcriptExpanded && <Text style={styles.transcriptText}>{episode.transcript}</Text>}
+              </View>
+            )}
           </>
         }
         renderItem={({ item }) => (
@@ -221,6 +266,22 @@ const styles = StyleSheet.create({
   video: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000", borderRadius: radii.md },
   audioWrap: { alignItems: "center", paddingTop: spacing.xl },
   actionRowWrap: { alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.md },
+  sectionLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "700" },
+  showNotesWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  showNotesText: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
+  transcriptStatusText: { ...typography.caption, color: colors.textSecondary },
+  transcriptStatusPadded: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  transcriptStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  retryLink: { ...typography.caption, color: colors.primary, fontWeight: "700" },
+  transcriptWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  transcriptHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  transcriptText: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
   listPadding: { paddingBottom: spacing.xl },
   commentRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
   commentAuthor: { ...typography.caption, color: colors.textSecondary, fontWeight: "700" },

@@ -5,8 +5,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { PageBackground } from "../components/PageBackground";
 import { CategoryPickerSheetMulti, SelectedCategoryChips } from "../components/CategoryPicker";
+import { matchCategories } from "../lib/categoryMatch";
 import { useSession } from "../context/SessionContext";
-import { updateProfile } from "../api/profiles";
+import { suggestWhichWay, updateProfile } from "../api/profiles";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
 
@@ -26,6 +27,8 @@ export default function EditProfileScreen() {
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestedCategories, setSuggestedCategories] = useState<string[]>([]);
 
   if (!activeProfile) return null;
 
@@ -33,6 +36,26 @@ export default function EditProfileScreen() {
     setCategories((prev) =>
       prev.includes(name) ? prev.filter((c) => c !== name) : prev.length < CATEGORIES_MAX ? [...prev, name] : prev
     );
+    setSuggestedCategories((prev) => prev.filter((c) => c !== name));
+  }
+
+  async function handleSuggestFromBio() {
+    const trimmedBio = bio.trim();
+    setError(null);
+    setSuggesting(true);
+    try {
+      const result = await suggestWhichWay(trimmedBio);
+      if (result.whichWay) {
+        setWhichWay(result.whichWay.slice(0, WHICH_WAY_MAX_LENGTH));
+      } else {
+        setError("Couldn't generate a suggestion right now — try again.");
+      }
+      // Runs locally regardless of whether the Which Way suggestion
+      // succeeded — matchCategories is free, no network call.
+      setSuggestedCategories(matchCategories(trimmedBio, 5).filter((c) => !categories.includes(c)));
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   async function handleSave() {
@@ -90,7 +113,16 @@ export default function EditProfileScreen() {
         {bio.length}/{BIO_MAX_LENGTH}
       </Text>
 
-      <Text style={styles.label}>Which Way</Text>
+      <View style={styles.whichWayLabelRow}>
+        <Text style={styles.label}>Which Way</Text>
+        <Pressable onPress={handleSuggestFromBio} disabled={bio.trim().length < 10 || suggesting} hitSlop={8}>
+          {suggesting ? (
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+          ) : (
+            <Text style={[styles.suggestLink, bio.trim().length < 10 && styles.suggestLinkDisabled]}>Suggest from bio ✨</Text>
+          )}
+        </Pressable>
+      </View>
       <TextInput
         style={[styles.input, styles.whichWayInput]}
         value={whichWay}
@@ -102,6 +134,16 @@ export default function EditProfileScreen() {
       <Text style={styles.counter}>
         {whichWay.length}/{WHICH_WAY_MAX_LENGTH}
       </Text>
+
+      {suggestedCategories.length > 0 && (
+        <View style={styles.suggestedChipsWrap}>
+          {suggestedCategories.map((name) => (
+            <Pressable key={name} style={styles.suggestedChip} onPress={() => toggleCategory(name)}>
+              <Text style={styles.suggestedChipText}>+ {name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.label}>Interests</Text>
       <Pressable style={styles.categoryTrigger} onPress={() => setCategoryPickerOpen(true)}>
@@ -140,6 +182,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...typography.h3, color: colors.textPrimary },
   label: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.xs },
+  whichWayLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  suggestLink: { ...typography.caption, color: colors.primary, fontWeight: "700" },
+  suggestLinkDisabled: { color: colors.textSecondary, opacity: 0.5 },
+  suggestedChipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.xs },
+  suggestedChip: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radii.pill,
+    paddingVertical: spacing.xs / 2,
+    paddingHorizontal: spacing.sm,
+  },
+  suggestedChipText: { ...typography.caption, color: colors.primary },
   input: {
     ...typography.body,
     color: colors.textPrimary,

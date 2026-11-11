@@ -7,12 +7,17 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   LiveKitRoom,
   VideoTrack,
+  useDataChannel,
   useLocalParticipant,
   useParticipants,
   useRoomContext,
   useTracks,
 } from "@livekit/react-native";
 import { Track } from "livekit-client";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { LIVEKIT_URL } from "../../api/config";
@@ -157,6 +162,69 @@ function CallRoomContent({
     return () => clearInterval(tick);
   }, [remoteJoined]);
 
+  // Live captions: each participant transcribes only their OWN mic
+  // on-device (expo-speech-recognition — iOS SFSpeechRecognizer / Android
+  // SpeechRecognizer), then broadcasts the resulting text over LiveKit's
+  // existing data channel. No backend involvement, no per-minute cost —
+  // see the "Live captioning" plan for why this beats a server ASR relay.
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const captionsOnRef = useRef(false);
+  const [finalCaption, setFinalCaption] = useState("");
+  const [partialCaption, setPartialCaption] = useState("");
+  const [remoteCaption, setRemoteCaption] = useState("");
+  const localCaption = `${finalCaption} ${partialCaption}`.trim();
+
+  useEffect(() => {
+    captionsOnRef.current = captionsOn;
+  }, [captionsOn]);
+
+  const { send: sendCaption } = useDataChannel("caption", (msg) => {
+    setRemoteCaption(new TextDecoder().decode(msg.payload));
+  });
+
+  useSpeechRecognitionEvent("result", (event) => {
+    if (!captionsOnRef.current) return;
+    const text = event.results[0]?.transcript ?? "";
+    if (event.isFinal) {
+      setFinalCaption((prev) => `${prev} ${text}`.trim());
+      setPartialCaption("");
+    } else {
+      setPartialCaption(text);
+    }
+  });
+
+  // Speech recognition is a best-effort enhancement to the call, not part
+  // of it — an error here (no network, unsupported locale, etc.) should
+  // never surface anything mid-call; the CC button simply stays off.
+  useSpeechRecognitionEvent("error", () => {});
+
+  useEffect(() => {
+    if (!captionsOn) return;
+    sendCaption(new TextEncoder().encode(localCaption), {}).catch(() => {});
+  }, [localCaption, captionsOn, sendCaption]);
+
+  useEffect(() => {
+    return () => {
+      if (captionsOnRef.current) ExpoSpeechRecognitionModule.stop();
+    };
+  }, []);
+
+  async function toggleCaptions() {
+    if (!Device.isDevice) return; // see canCapture above — needs real mic capture
+    if (captionsOn) {
+      ExpoSpeechRecognitionModule.stop();
+      setCaptionsOn(false);
+      setFinalCaption("");
+      setPartialCaption("");
+      sendCaption(new TextEncoder().encode(""), {}).catch(() => {});
+      return;
+    }
+    const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!perm.granted) return;
+    setCaptionsOn(true);
+    ExpoSpeechRecognitionModule.start({ lang: "en-US", interimResults: true, continuous: true });
+  }
+
   const remoteTrack = tracks.find((t) => !t.participant.isLocal);
   const localTrack = tracks.find((t) => t.participant.isLocal);
 
@@ -197,6 +265,13 @@ function CallRoomContent({
         <Text style={styles.statusText}>{remoteJoined ? formatDuration(seconds) : "Ringing…"}</Text>
       </View>
 
+      {(localCaption || remoteCaption) && (
+        <View style={styles.captionOverlay}>
+          {localCaption ? <Text style={styles.captionText}>You: {localCaption}</Text> : null}
+          {remoteCaption ? <Text style={styles.captionText}>{otherDisplayName}: {remoteCaption}</Text> : null}
+        </View>
+      )}
+
       {isVideo && isCameraEnabled && localTrack && (
         <View style={styles.pip}>
           <VideoTrack trackRef={localTrack} style={styles.pipVideo} objectFit="cover" mirror />
@@ -205,6 +280,7 @@ function CallRoomContent({
 
       <View style={styles.controls}>
         <ControlButton icon={isMicrophoneEnabled ? "mic" : "mic-off"} active={!isMicrophoneEnabled} onPress={toggleMic} />
+        <ControlButton icon="logo-closed-captioning" active={captionsOn} onPress={toggleCaptions} />
         {isVideo && (
           <>
             <ControlButton icon={isCameraEnabled ? "videocam" : "videocam-off"} active={!isCameraEnabled} onPress={toggleCamera} />
@@ -304,6 +380,24 @@ const styles = StyleSheet.create({
   },
   nameText: { ...typography.h2, color: colors.textOnPrimary, textAlign: "center" },
   statusText: { ...typography.body, color: colors.primaryLight, marginTop: spacing.xs, textAlign: "center", paddingHorizontal: spacing.xl },
+  captionOverlay: {
+    position: "absolute",
+    top: spacing.xxl + 72,
+    left: spacing.lg,
+    right: spacing.lg,
+    alignItems: "center",
+  },
+  captionText: {
+    ...typography.body,
+    color: colors.textOnPrimary,
+    textAlign: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.md,
+    marginTop: spacing.xs,
+    overflow: "hidden",
+  },
   pip: {
     position: "absolute",
     top: spacing.lg,

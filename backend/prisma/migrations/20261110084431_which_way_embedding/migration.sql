@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Profile" ADD COLUMN     "whichWayEmbedding" DOUBLE PRECISION[] DEFAULT ARRAY[]::DOUBLE PRECISION[];

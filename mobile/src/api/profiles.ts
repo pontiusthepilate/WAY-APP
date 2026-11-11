@@ -26,6 +26,13 @@ export function updateProfile(
   return api.patch<Profile>(`/profiles/${id}`, input);
 }
 
+// Stateless — generates a Which Way teaser from bio text, doesn't touch
+// any saved profile. Category suggestion from the same bio happens
+// entirely client-side via lib/categoryMatch.ts's matchCategories.
+export function suggestWhichWay(bio: string) {
+  return api.post<{ whichWay: string | null }>("/profiles/suggest-which-way", { bio });
+}
+
 // The gated full-profile fetch (feature: profile access) — distinct from
 // getProfileByWayId above, which stays public/unrestricted for the
 // existing mini-profile modal. Returns either the full row or a restricted
@@ -80,6 +87,7 @@ export function updateNotificationPrefs(
       | "notifyLive"
       | "notifyWayRequests"
       | "notifyCameraRequests"
+      | "notifyDigest"
     >
   >
 ) {

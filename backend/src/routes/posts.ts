@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { getSuppressedProfileIds } from "../lib/blocking";
+import { textViolatesPolicy, REJECTED_CONTENT_ERROR } from "../lib/moderation";
 
 const createPostBody = z.object({
   profileId: z.string(),
@@ -83,6 +84,10 @@ export async function postRoutes(app: FastifyInstance) {
       if (!!body.mediaUrl !== !!body.eventMediaType) {
         return reply.status(400).send({ error: "mediaUrl and eventMediaType must be given together" });
       }
+    }
+
+    if (await textViolatesPolicy(body.caption, body.eventTitle, body.eventLocation)) {
+      return reply.status(422).send(REJECTED_CONTENT_ERROR);
     }
 
     const post = await prisma.post.create({
@@ -337,6 +342,10 @@ export async function postRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const body = commentBody.parse(req.body);
     await assertOwnsProfile(userId, body.profileId);
+
+    if (await textViolatesPolicy(body.text)) {
+      return reply.status(422).send(REJECTED_CONTENT_ERROR);
+    }
 
     const [comment, post] = await prisma.$transaction([
       prisma.comment.create({ data: { postId: id, profileId: body.profileId, text: body.text } }),

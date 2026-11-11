@@ -12,6 +12,7 @@ import {
   isPaystackConfigured,
   verifyTransaction,
 } from "../lib/paystack";
+import { assessTransferRisk } from "../lib/fraudDetection";
 
 const currencySchema = z.string().refine(isAllowedCurrency, {
   message: `Currency must be one of: ${ALLOWED_CURRENCIES.join(", ")}`,
@@ -195,6 +196,21 @@ export async function walletRoutes(app: FastifyInstance) {
     const receiverWallet = await getOrCreateWallet(receiver.id);
     const groupId = randomUUID();
 
+    // Scored against state as it stands *before* this transfer is
+    // written — scoring after would let the transfer's own just-created
+    // row dilute its own history (e.g. a brand-new counterparty would
+    // look "known" because of the row this very request is about to
+    // create). "Allow + flag for review" (see lib/fraudDetection.ts):
+    // the transfer below always proceeds regardless of this result.
+    const risk = await assessTransferRisk({
+      senderWalletId: senderWallet.id,
+      senderProfileId: sender.id,
+      senderProfileCreatedAt: sender.createdAt,
+      counterpartyProfileId: receiver.id,
+      currency: body.currency,
+      amount: body.amount,
+    });
+
     try {
       const outTx = await prisma.$transaction(async (tx) => {
         const debit = await tx.walletBalance.updateMany({
@@ -233,6 +249,21 @@ export async function walletRoutes(app: FastifyInstance) {
           },
         });
       });
+
+      if (risk.flagged) {
+        await prisma.walletFraudFlag.create({
+          data: {
+            profileId: sender.id,
+            groupId,
+            counterpartyProfileId: receiver.id,
+            currency: body.currency,
+            amount: body.amount,
+            score: risk.score,
+            reasons: risk.reasons,
+          },
+        });
+      }
+
       reply.status(201).send(outTx);
     } catch (err) {
       if (err instanceof InsufficientBalanceError) {

@@ -61,16 +61,16 @@ model OtpCode {
 // A single WAY identity (WAY-ID). Each User gets 2 free profiles and can run
 // them independently, e.g. a personal profile and a business profile.
 model Profile {
-  id          String  @id @default(cuid())
-  userId      String
-  user        User    @relation(fields: [userId], references: [id])
-  wayId       String  @unique // the handle people search for / ask for socially as "your WAY"
-  displayName String
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  wayId             String   @unique // the handle people search for / ask for socially as "your WAY"
+  displayName       String
   displayPictureUrl String?
-  bio         String?
-  categories  String[] @default([]) // interests / category tags used for search filtering
-  kind        String   @default("personal") // free-form label, e.g. "personal" | "business"
-  isVerified  Boolean  @default(false)
+  bio               String?
+  categories        String[] @default([]) // interests / category tags used for search filtering
+  kind              String   @default("personal") // free-form label, e.g. "personal" | "business"
+  isVerified        Boolean  @default(false)
 
   // One of a small fixed set of permanent, non-interactive profiles —
   // LowC (personal, memorial), WAY Ltd (business), WayCast (podcast) —
@@ -88,7 +88,7 @@ model Profile {
   // PATCH /profiles/:id/primary), not a DB constraint. The wayId model
   // itself stays flat/global (see project memory on username structure);
   // this is just a default-selection flag layered on top of it.
-  isPrimary   Boolean  @default(false)
+  isPrimary Boolean @default(false)
 
   followersCount Int @default(0)
   followingCount Int @default(0)
@@ -106,7 +106,12 @@ model Profile {
   // mini-profile card and used as search-matchable free text (see
   // lib/describeMatch.ts) — separate from visibilityText, which is a
   // purely decorative caption, not search data.
-  whichWay String?
+  whichWay          String?
+  // Voyage AI embedding of whichWay (see lib/voyage.ts), used by
+  // geo.ts's semantic ranking of "describe" searches. Empty = never
+  // embedded yet (no whichWay, or VOYAGE_API_KEY unset at save time) —
+  // callers always fall back to plain ILIKE matching in that case.
+  whichWayEmbedding Float[] @default([])
 
   // Auto-grant-full-profile-access rules (feature: profile access), evaluated
   // only for an *accepted* connector (see lib/profileAccess.ts) — never for a
@@ -130,15 +135,22 @@ model Profile {
   // in-app Notification row) for this profile. Accept-confirmation pushes
   // (way-request accepted, camera access granted) are intentionally ungated
   // everywhere, since they're a direct response to the user's own action.
-  notifyLikes           Boolean @default(true)
-  notifyComments        Boolean @default(true)
-  notifyFollows         Boolean @default(true)
-  notifyMessages        Boolean @default(true)
-  notifyCalls           Boolean @default(true)
-  notifyLive            Boolean @default(true)
-  notifyWayRequests     Boolean @default(true)
-  notifyCameraRequests  Boolean @default(true)
+  notifyLikes                 Boolean @default(true)
+  notifyComments              Boolean @default(true)
+  notifyFollows               Boolean @default(true)
+  notifyMessages              Boolean @default(true)
+  notifyCalls                 Boolean @default(true)
+  notifyLive                  Boolean @default(true)
+  notifyWayRequests           Boolean @default(true)
+  notifyCameraRequests        Boolean @default(true)
   notifyProfileAccessRequests Boolean @default(true)
+  // Weekly digest (feature 8): batches likes/comments/follows — the three
+  // types above that never push on their own — into one periodic push.
+  // lastDigestSentAt drives both the per-profile counting window and the
+  // "only one caller wins" claim in routes/digest.ts; null until this
+  // profile's first digest run.
+  notifyDigest     Boolean   @default(true)
+  lastDigestSentAt DateTime?
 
   // Location (feature 5): a profile's displayed location can be overridden to
   // anywhere on earth; actualLat/actualLng always hold the real device location.
@@ -146,7 +158,7 @@ model Profile {
   actualLng            Float?
   displayLat           Float?
   displayLng           Float?
-  isLocationOverridden Boolean @default(false)
+  isLocationOverridden Boolean   @default(false)
   lastActiveAt         DateTime?
 
   // Kept in sync with displayLat/displayLng via raw SQL on write; used for
@@ -160,6 +172,7 @@ model Profile {
 
   pushTokens   PushToken[]
   liveSessions LiveSession[]
+  supportConversation SupportConversation?
 
   linksFrom ProfileLink[] @relation("ProfileLinksFrom")
   linksTo   ProfileLink[] @relation("ProfileLinksTo")
@@ -189,6 +202,15 @@ model Episode {
   commentsCount Int      @default(0)
   sharesCount   Int      @default(0)
   createdAt     DateTime @default(now())
+
+  // Transcription pipeline (lib/transcription.ts = Deepgram,
+  // lib/episodeShowNotes.ts = Claude) — kicked off automatically on
+  // creation, see routes/episodes.ts. "none" means never attempted
+  // (DEEPGRAM_API_KEY unset at creation time, or created before this
+  // feature shipped — see scripts/backfill-episode-transcripts.ts).
+  transcript       String?
+  showNotes        String?
+  transcriptStatus String  @default("none") // "none" | "pending" | "ready" | "failed"
 
   likes    EpisodeLike[]
   comments EpisodeComment[]
@@ -252,15 +274,15 @@ model ProfileLink {
 // through search (feature 2). Media is a URL into object storage — uploading
 // the file there is a separate concern from this record.
 model WayRequest {
-  id             String    @id @default(cuid())
-  fromProfileId  String
-  toProfileId    String
-  text           String?
-  mediaUrl       String?
-  mediaType      String? // "image" | "video"
-  status         String    @default("pending") // pending | accepted | declined
-  createdAt      DateTime  @default(now())
-  respondedAt    DateTime?
+  id            String    @id @default(cuid())
+  fromProfileId String
+  toProfileId   String
+  text          String?
+  mediaUrl      String?
+  mediaType     String? // "image" | "video"
+  status        String    @default("pending") // pending | accepted | declined
+  createdAt     DateTime  @default(now())
+  respondedAt   DateTime?
 
   // The search mode the sender found the recipient through (set by the
   // mobile client at send time) — "nearby" | "address" | "location" |
@@ -316,7 +338,7 @@ model Post {
   eventTitle      String?
   eventLocation   String?
   eventStartsAt   DateTime?
-  eventCategories String[] @default([])
+  eventCategories String[]  @default([])
   // Post.mediaUrl doubles as the event's cover photo/video; this says which
   // it is, mirroring the top-level type field's own image/video distinction
   // since "event" itself doesn't tell you that.
@@ -398,20 +420,43 @@ model WalletBalance {
 // receiver's), sharing groupId, so "history with this specific person" is
 // just a filter on counterpartyProfileId.
 model Transaction {
-  id                 String   @id @default(cuid())
-  walletId           String
-  wallet             Wallet   @relation(fields: [walletId], references: [id])
-  groupId            String // links the two legs of a transfer; unique per fund
-  type               String // "fund" | "transfer_out" | "transfer_in"
-  currency           String
-  amount             Int // minor units, always positive — sign is implied by type
+  id                    String   @id @default(cuid())
+  walletId              String
+  wallet                Wallet   @relation(fields: [walletId], references: [id])
+  groupId               String // links the two legs of a transfer; unique per fund
+  type                  String // "fund" | "transfer_out" | "transfer_in"
+  currency              String
+  amount                Int // minor units, always positive — sign is implied by type
   counterpartyProfileId String?
-  method             String? // for type "fund": "card" | "crypto"
-  description        String?
-  createdAt          DateTime @default(now())
+  method                String? // for type "fund": "card" | "crypto"
+  description           String?
+  createdAt             DateTime @default(now())
 
   @@index([walletId, createdAt])
   @@index([walletId, counterpartyProfileId])
+}
+
+// An automated risk flag on a transfer (see lib/fraudDetection.ts),
+// written after the transfer already completed — this app's policy is
+// "allow + flag for review," not block/hold, so there's no reversal
+// mechanism here; any real follow-up (blocking the profile, contacting
+// the user) stays a manual step outside this system, same as Report's
+// own stated scope. groupId links back to the transfer's own
+// Transaction.groupId.
+model WalletFraudFlag {
+  id                    String   @id @default(cuid())
+  profileId             String // the sender being flagged
+  groupId               String
+  counterpartyProfileId String
+  currency              String
+  amount                Int
+  score                 Float
+  reasons               String[] // short rule-based explanations, e.g. "Rapid succession of transfers"
+  status                String   @default("pending") // "pending" | "reviewed" | "dismissed"
+  createdAt             DateTime @default(now())
+
+  @@index([profileId])
+  @@index([status])
 }
 
 // A real Paystack checkout in flight. Created "pending" when we ask Paystack
@@ -506,26 +551,26 @@ model LiveChatMessage {
 // Nothing streams until the target explicitly accepts; accepting creates a
 // RemoteCameraSession. The target can end that session at any time.
 model RemoteCameraRequest {
-  id          String    @id @default(cuid())
-  fromProfileId String  // wants to view the stream
-  toProfileId   String  // owns the camera being asked for
-  message     String?
-  status      String    @default("pending") // "pending" | "accepted" | "declined"
-  createdAt   DateTime  @default(now())
-  respondedAt DateTime?
+  id            String    @id @default(cuid())
+  fromProfileId String // wants to view the stream
+  toProfileId   String // owns the camera being asked for
+  message       String?
+  status        String    @default("pending") // "pending" | "accepted" | "declined"
+  createdAt     DateTime  @default(now())
+  respondedAt   DateTime?
 
   @@index([toProfileId, status])
   @@index([fromProfileId])
 }
 
 model RemoteCameraSession {
-  id            String    @id @default(cuid())
-  requestId     String    @unique
-  granterId     String // the camera owner — the only one actually broadcasting
-  requesterId   String // the viewer
-  status        String    @default("active") // "active" | "ended"
-  startedAt     DateTime  @default(now())
-  endedAt       DateTime?
+  id          String    @id @default(cuid())
+  requestId   String    @unique
+  granterId   String // the camera owner — the only one actually broadcasting
+  requesterId String // the viewer
+  status      String    @default("active") // "active" | "ended"
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
 
   @@index([granterId, status])
   @@index([requesterId, status])
@@ -549,14 +594,40 @@ model Conversation {
 }
 
 model DirectMessage {
-  id             String       @id @default(cuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderProfileId String
-  text           String?
-  mediaUrl       String?
-  mediaType      String? // "image" | "video"
-  createdAt      DateTime     @default(now())
+  text            String?
+  mediaUrl        String?
+  mediaType       String? // "image" | "video"
+  createdAt       DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// A single, continuous support chat per profile (feature 10) — one
+// running thread, not a list of tickets, hence profileId being @unique
+// rather than following Conversation/DirectMessage's two-profile shape.
+// Separate from those models on purpose: they're hard-wired to two real
+// profiles with no room for an assistant turn.
+model SupportConversation {
+  id        String   @id @default(cuid())
+  profileId String   @unique
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages SupportMessage[]
+}
+
+model SupportMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  text           String
+  createdAt      DateTime            @default(now())
 
   @@index([conversationId, createdAt])
 }
@@ -582,13 +653,13 @@ model Block {
 // WayRequest's status-string convention; nothing currently automates
 // processing these beyond recording them.
 model Report {
-  id               String   @id @default(cuid())
+  id                String   @id @default(cuid())
   reporterProfileId String
-  targetType       String // "profile" | "post" | "comment"
-  targetId         String
-  reason           String
-  status           String   @default("pending") // "pending" | "reviewed" | "dismissed"
-  createdAt        DateTime @default(now())
+  targetType        String // "profile" | "post" | "comment"
+  targetId          String
+  reason            String
+  status            String   @default("pending") // "pending" | "reviewed" | "dismissed"
+  createdAt         DateTime @default(now())
 
   @@index([targetType, targetId])
   @@index([status])
@@ -601,14 +672,14 @@ model Report {
 // agreed-on rule: status visibility = profile visibility settings), not a
 // separate per-status flag.
 model Status {
-  id          String   @id @default(cuid())
-  profileId   String
-  mediaUrl    String?
-  mediaType   String? // "image" | "video"
-  caption     String?
+  id              String   @id @default(cuid())
+  profileId       String
+  mediaUrl        String?
+  mediaType       String? // "image" | "video"
+  caption         String?
   backgroundColor String? // for a text-only status card
-  createdAt   DateTime @default(now())
-  expiresAt   DateTime
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
 
   @@index([profileId, expiresAt])
 }
@@ -618,16 +689,16 @@ model Status {
 // trigger point, so push stays "fire and forget" while this is what the
 // notifications center actually reads/paginates/marks-read.
 model Notification {
-  id             String   @id @default(cuid())
-  profileId      String // recipient
-  type           String // "like" | "comment" | "follow" | "way_request" | "way_request_accepted" | "way_request_declined" | "camera_request" | "go_live" | "profile_access_request" | "profile_access_response"
-  actorProfileId String?
-  postId         String?
-  episodeId      String?
+  id                     String   @id @default(cuid())
+  profileId              String // recipient
+  type                   String // "like" | "comment" | "follow" | "way_request" | "way_request_accepted" | "way_request_declined" | "camera_request" | "go_live" | "profile_access_request" | "profile_access_response"
+  actorProfileId         String?
+  postId                 String?
+  episodeId              String?
   profileAccessRequestId String?
-  wayRequestId   String?
-  read           Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  wayRequestId           String?
+  read                   Boolean  @default(false)
+  createdAt              DateTime @default(now())
 
   @@index([profileId, createdAt])
   @@index([profileId, read])

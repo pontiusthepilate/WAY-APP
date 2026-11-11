@@ -6,6 +6,19 @@ import { geocodeAddress, GeocodeConfigError } from "../lib/geocode";
 import { normalizeWayId } from "../lib/wayId";
 import { getSuppressedProfileIds } from "../lib/blocking";
 import { significantWords } from "../lib/describeMatch";
+import { embedText } from "../lib/voyage";
+import { parseSearchQuery } from "../lib/searchIntent";
+
+const parseQueryBody = z.object({ query: z.string().min(1).max(300) });
+
+// Shared by all three geo routes below: embeds the describe query for
+// semantic ranking (see geo.ts), falling back to undefined (pure lexical
+// matching, today's behavior) if there's no query, Voyage isn't
+// configured, or the embed call fails — embedText never throws.
+async function embedDescribeQuery(describe: string | undefined): Promise<number[] | undefined> {
+  if (!describe) return undefined;
+  return (await embedText(describe, "query")) ?? undefined;
+}
 
 // Config/outage errors are logged with the real reason but never shown to
 // the end user verbatim; a bad address gets its own (already friendly) message.
@@ -115,6 +128,7 @@ export async function searchRoutes(app: FastifyInstance) {
       radiusMeters: q.radiusMeters,
       category: q.category,
       describeWords: q.describe ? significantWords(q.describe) : undefined,
+      queryEmbedding: await embedDescribeQuery(q.describe),
       excludeProfileId: q.profileId,
       excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToNearby",
@@ -147,6 +161,7 @@ export async function searchRoutes(app: FastifyInstance) {
       radiusMeters: q.radiusMeters,
       category: q.category,
       describeWords: q.describe ? significantWords(q.describe) : undefined,
+      queryEmbedding: await embedDescribeQuery(q.describe),
       excludeProfileId: q.profileId,
       excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToAddress",
@@ -177,6 +192,7 @@ export async function searchRoutes(app: FastifyInstance) {
       radiusMeters: q.radiusMeters,
       category: q.category,
       describeWords: q.describe ? significantWords(q.describe) : undefined,
+      queryEmbedding: await embedDescribeQuery(q.describe),
       excludeProfileId: q.profileId,
       excludeProfileIds: await getSuppressedProfileIds(q.profileId, { includeMuted: false }),
       visibilityColumn: "visibleToLocation",
@@ -252,5 +268,15 @@ export async function searchRoutes(app: FastifyInstance) {
     ]);
 
     return { people, businesses, podcasts, location };
+  });
+
+  // F) PARSE QUERY — turns a free-text natural-language query into the
+  // same structured fields the manual search UI already produces (see
+  // lib/searchIntent.ts). Produces intent only; the mobile client applies
+  // it to its own state and calls the routes above exactly as if the
+  // user had filled them in by hand — no search execution happens here.
+  app.post("/search/parse-query", { onRequest: [app.authenticate] }, async (req) => {
+    const { query } = parseQueryBody.parse(req.body);
+    return parseSearchQuery(query);
   });
 }

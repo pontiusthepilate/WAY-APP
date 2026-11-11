@@ -17,7 +17,8 @@ type PrefKey =
   | "notifyCalls"
   | "notifyLive"
   | "notifyWayRequests"
-  | "notifyCameraRequests";
+  | "notifyCameraRequests"
+  | "notifyDigest";
 
 const PREFS: { key: PrefKey; label: string }[] = [
   { key: "notifyLikes", label: "Likes" },
@@ -28,6 +29,7 @@ const PREFS: { key: PrefKey; label: string }[] = [
   { key: "notifyLive", label: "Live broadcasts" },
   { key: "notifyWayRequests", label: "WAY requests" },
   { key: "notifyCameraRequests", label: "Camera requests" },
+  { key: "notifyDigest", label: "Weekly activity digest" },
 ];
 
 export default function NotificationPreferencesScreen() {

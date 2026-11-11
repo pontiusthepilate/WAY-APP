@@ -80,6 +80,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       else if (data?.remoteCameraRequestId) router.push(`/camera-request/${data.remoteCameraRequestId}`);
       else if (data?.remoteCameraSessionId) router.push(`/remote-camera/${data.remoteCameraSessionId}`);
       else if (data?.wayRequestId) router.push(`/way-request/${data.wayRequestId}`);
+      else if (data?.type === "digest") router.push("/notifications");
     });
     return () => sub.remove();
   }, [router]);

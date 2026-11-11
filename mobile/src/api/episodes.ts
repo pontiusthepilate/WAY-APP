@@ -61,3 +61,7 @@ export function addEpisodeComment(episodeId: string, input: { profileId: string;
 export function registerEpisodeShare(episodeId: string) {
   return api.post<{ sharesCount: number }>(`/episodes/${episodeId}/share`);
 }
+
+export function retryEpisodeTranscription(episodeId: string) {
+  return api.post<{ transcriptStatus: Episode["transcriptStatus"] }>(`/episodes/${episodeId}/transcribe`);
+}

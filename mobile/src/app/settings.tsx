@@ -79,6 +79,7 @@ export default function SettingsScreen() {
       )}
 
       <Text style={styles.sectionLabel}>About</Text>
+      <Row icon="chatbubble-ellipses-outline" label="Support assistant" onPress={() => router.push("/support-assistant")} />
       <Row icon="information-circle-outline" label="About WAY" onPress={() => router.push("/about")} />
 
       <Pressable style={styles.signOutButton} onPress={handleSignOut}>

@@ -3,6 +3,9 @@ import { z } from "zod";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
+import { textViolatesPolicy, REJECTED_CONTENT_ERROR } from "../lib/moderation";
+import { isTranscriptionConfigured, transcribeAudio } from "../lib/transcription";
+import { generateShowNotes } from "../lib/episodeShowNotes";
 
 const createEpisodeBody = z.object({
   profileId: z.string(),
@@ -38,6 +41,25 @@ async function withViewerLiked<T extends { id: string }>(episodes: T[], viewerPr
   return episodes.map((e) => ({ ...e, viewerLiked: likedIds.has(e.id) }));
 }
 
+// Runs transcription (Deepgram, lib/transcription.ts) then show-notes
+// generation (Claude, lib/episodeShowNotes.ts) for one episode, and
+// writes the result back. Always fire-and-forget from its callers —
+// never awaited by a request handler, since Deepgram's own pre-recorded
+// endpoint can take real time for a full episode. Exported so both
+// POST /episodes (below) and the backfill script can call it directly.
+export async function processEpisodeTranscription(episodeId: string, mediaUrl: string) {
+  const transcript = await transcribeAudio(mediaUrl);
+  if (!transcript) {
+    await prisma.episode.update({ where: { id: episodeId }, data: { transcriptStatus: "failed" } });
+    return;
+  }
+  const showNotes = await generateShowNotes(transcript);
+  await prisma.episode.update({
+    where: { id: episodeId },
+    data: { transcript, showNotes, transcriptStatus: "ready" },
+  });
+}
+
 // Podcast-profile content (profile-kind feature phase 4) — a separate model
 // from Post, never going through the regular post composer/feed.
 export async function episodeRoutes(app: FastifyInstance) {
@@ -49,8 +71,37 @@ export async function episodeRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: "Only podcast profiles can publish episodes" });
     }
 
-    const episode = await prisma.episode.create({ data: body, include: EPISODE_INCLUDE });
+    const transcriptionConfigured = isTranscriptionConfigured();
+    const episode = await prisma.episode.create({
+      data: { ...body, transcriptStatus: transcriptionConfigured ? "pending" : "none" },
+      include: EPISODE_INCLUDE,
+    });
     reply.status(201).send(episode);
+
+    if (transcriptionConfigured) {
+      processEpisodeTranscription(episode.id, episode.mediaUrl).catch((err) =>
+        app.log.error({ err, episodeId: episode.id }, "episode transcription pipeline failed")
+      );
+    }
+  });
+
+  // Owner-only retry for a "failed" episode (or a re-run on any status) —
+  // also the mechanism scripts/backfill-episode-transcripts.ts uses.
+  app.post("/episodes/:id/transcribe", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    const episode = await prisma.episode.findUnique({ where: { id } });
+    if (!episode) return reply.status(404).send({ error: "Not found" });
+    await assertOwnsProfile(userId, episode.profileId);
+    if (!isTranscriptionConfigured()) {
+      return reply.status(422).send({ error: "Transcription isn't configured" });
+    }
+
+    await prisma.episode.update({ where: { id }, data: { transcriptStatus: "pending" } });
+    reply.status(202).send({ transcriptStatus: "pending" });
+    processEpisodeTranscription(id, episode.mediaUrl).catch((err) =>
+      app.log.error({ err, episodeId: id }, "episode transcription retry failed")
+    );
   });
 
   // Cross-podcast reverse-chronological feed — the "podcast-focused feed"
@@ -166,6 +217,10 @@ export async function episodeRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const body = commentBody.parse(req.body);
     await assertOwnsProfile(userId, body.profileId);
+
+    if (await textViolatesPolicy(body.text)) {
+      return reply.status(422).send(REJECTED_CONTENT_ERROR);
+    }
 
     const [comment, episode] = await prisma.$transaction([
       prisma.episodeComment.create({ data: { episodeId: id, profileId: body.profileId, text: body.text } }),

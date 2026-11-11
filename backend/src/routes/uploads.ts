@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
+import { moderateImage, REJECTED_CONTENT_ERROR } from "../lib/moderation";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
@@ -41,12 +42,9 @@ export async function uploadRoutes(app: FastifyInstance) {
     if (!ext) return reply.status(415).send({ error: `Unsupported file type: ${file.mimetype}` });
 
     const filename = `${randomUUID()}${ext}`;
-    await pipeline(file.file, createWriteStream(path.join(UPLOAD_DIR, filename)));
+    const filePath = path.join(UPLOAD_DIR, filename);
+    await pipeline(file.file, createWriteStream(filePath));
 
-    // `||`, not `??` — an empty PUBLIC_BASE_URL (present but unset in .env)
-    // must fall back too, or this produces a relative "/uploads/..." path
-    // that fails every URL-shaped validation downstream (documentUrls, etc).
-    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.headers.host}`;
     const mediaType = file.mimetype === "application/pdf"
       ? "document"
       : file.mimetype.startsWith("video/")
@@ -54,6 +52,23 @@ export async function uploadRoutes(app: FastifyInstance) {
         : file.mimetype.startsWith("audio/")
           ? "audio"
           : "image";
+
+    // Image moderation runs here rather than at every post/status/DM/
+    // profile-picture call site — this is the one chokepoint every image
+    // passes through (see lib/moderation.ts). Video/audio/PDF aren't
+    // checked yet (see the content-moderation plan's scope notes).
+    if (mediaType === "image") {
+      const result = await moderateImage(filePath, ext);
+      if (result.flagged) {
+        await unlink(filePath).catch(() => {});
+        return reply.status(422).send(REJECTED_CONTENT_ERROR);
+      }
+    }
+
+    // `||`, not `??` — an empty PUBLIC_BASE_URL (present but unset in .env)
+    // must fall back too, or this produces a relative "/uploads/..." path
+    // that fails every URL-shaped validation downstream (documentUrls, etc).
+    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.headers.host}`;
     reply.status(201).send({ url: `${base}/uploads/${filename}`, mediaType });
   });
 }

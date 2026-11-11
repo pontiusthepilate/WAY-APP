@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/db";
 import { requireUser, assertOwnsProfile } from "../lib/auth";
+import { textViolatesPolicy, REJECTED_CONTENT_ERROR } from "../lib/moderation";
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
@@ -22,6 +23,10 @@ export async function statusRoutes(app: FastifyInstance) {
     const { userId } = requireUser(req);
     const body = createStatusBody.parse(req.body);
     await assertOwnsProfile(userId, body.profileId);
+
+    if (await textViolatesPolicy(body.caption)) {
+      return reply.status(422).send(REJECTED_CONTENT_ERROR);
+    }
 
     const status = await prisma.status.create({
       data: { ...body, expiresAt: new Date(Date.now() + STATUS_LIFETIME_MS) },

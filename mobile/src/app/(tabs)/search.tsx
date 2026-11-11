@@ -31,7 +31,7 @@ import { CategoryPickerSheet, CategoryTrigger } from "../../components/CategoryP
 import { useSession } from "../../context/SessionContext";
 import { useDeviceLocation } from "../../lib/useDeviceLocation";
 import { DEFAULT_COUNTRY, type Country } from "../../lib/countries";
-import { searchAddress, searchAll, searchByWayId, searchLocation, searchNearby } from "../../api/search";
+import { parseSearchQuery, searchAddress, searchAll, searchByWayId, searchLocation, searchNearby } from "../../api/search";
 import { newSessionToken, retrievePlace, suggestPlaces, type PlaceSuggestion } from "../../api/mapbox";
 import { PlaceSuggestions } from "../../components/PlaceSuggestions";
 import { MapPickerModal } from "../../components/MapPickerModal";
@@ -72,6 +72,7 @@ export default function SearchScreen() {
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [allQueryText, setAllQueryText] = useState("");
+  const [nlQuery, setNlQuery] = useState("");
   const [unifiedResults, setUnifiedResults] = useState<UnifiedSearchResults | null>(null);
   const language = useSearchLanguage();
 
@@ -287,6 +288,69 @@ export default function SearchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords, mode]);
 
+  // Natural-language search: parses nlQuery into the same structured
+  // fields the manual controls below produce (lib/searchIntent.ts on the
+  // backend), then searches with those values directly — mirrors
+  // jumpToLocation/selectAddressSuggestion below, which also call the
+  // search*/searchAll API functions directly with freshly-resolved values
+  // rather than through runSearch, since setMode/setAddressText etc.
+  // wouldn't have flowed through a render yet for runSearch's closure to see.
+  async function handleNaturalLanguageSearch() {
+    const trimmed = nlQuery.trim();
+    if (!trimmed || !activeProfile) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const parsed = await parseSearchQuery(trimmed);
+      setMode(parsed.mode);
+      setCategory("");
+      const radius = parsed.radiusMeters ?? radiusMeters;
+      if (parsed.radiusMeters) setRadiusMeters(radius);
+
+      let next: NearbyResult[] = [];
+      if (parsed.mode === "nearby") {
+        const point = coords ?? (await refreshDeviceLocation());
+        if (!point) {
+          setError("Turn on location access to search nearby.");
+          return;
+        }
+        next = await searchNearby({ profileId: activeProfile.id, radiusMeters: radius, describe: parsed.describe ?? undefined, ...point });
+      } else if (parsed.mode === "address") {
+        if (!parsed.locationQuery) {
+          setError("Enter a street address to search.");
+          return;
+        }
+        setAddressText(parsed.locationQuery);
+        setAddressCoords(null);
+        next = await searchAddress({ profileId: activeProfile.id, address: parsed.locationQuery, radiusMeters: radius, describe: parsed.describe ?? undefined, language });
+      } else if (parsed.mode === "location") {
+        if (!parsed.locationQuery) {
+          setError("Enter a place, city, state, or country to search.");
+          return;
+        }
+        setLocationText(parsed.locationQuery);
+        setLocationCoords(null);
+        next = await searchLocation({ profileId: activeProfile.id, query: parsed.locationQuery, radiusMeters: radius, describe: parsed.describe ?? undefined, language });
+      } else if (parsed.mode === "wayid") {
+        const q = parsed.wayIdQuery ?? trimmed;
+        setWayIdText(q);
+        next = await searchByWayId({ profileId: activeProfile.id, query: q });
+        if (next.length === 0) setError("No WAY found with that ID or phone number.");
+      } else {
+        const q = parsed.allQuery ?? trimmed;
+        setAllQueryText(q);
+        const unified = await searchAll({ profileId: activeProfile.id, query: q, language });
+        setUnifiedResults(unified);
+        next = [...unified.people, ...unified.businesses, ...unified.podcasts];
+      }
+      setResults(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Jumps from a unified-search location suggestion straight into Location
   // mode, already centered there — reuses the lat/lng this search already
   // resolved instead of re-geocoding the same text a second time.
@@ -453,6 +517,26 @@ export default function SearchScreen() {
       {resultKind === "profiles" && (
       <>
       <View style={styles.controls}>
+        <View style={styles.inputWrap}>
+          <Ionicons name="sparkles-outline" size={18} color={colors.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Try 'bike mechanics near me' or '@wayid'"
+            placeholderTextColor={colors.textSecondary}
+            value={nlQuery}
+            onChangeText={setNlQuery}
+            onSubmitEditing={handleNaturalLanguageSearch}
+            returnKeyType="search"
+          />
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+          ) : (
+            <Pressable onPress={handleNaturalLanguageSearch} hitSlop={8} accessibilityLabel="Search">
+              <Ionicons name="arrow-forward-circle" size={22} color={colors.primary} />
+            </Pressable>
+          )}
+        </View>
+
         <SearchModeTabs value={mode} onChange={setMode} />
 
         {mode === "address" && (

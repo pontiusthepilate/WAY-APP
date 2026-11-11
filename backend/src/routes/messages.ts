@@ -6,6 +6,7 @@ import { PROFILE_SUMMARY_SELECT } from "../lib/profileSummary";
 import { isBlockedEitherWay } from "../lib/blocking";
 import { assertParticipant } from "../lib/conversations";
 import { notifyProfiles } from "../lib/expoPush";
+import { textViolatesPolicy, REJECTED_CONTENT_ERROR } from "../lib/moderation";
 
 const startConversationBody = z.object({ profileId: z.string(), withProfileId: z.string() });
 const listQuery = z.object({ profileId: z.string() });
@@ -132,6 +133,10 @@ export async function messageRoutes(app: FastifyInstance) {
     const body = sendMessageBody.parse(req.body);
     const sender = await assertOwnsProfile(userId, body.profileId);
     const conversation = await assertParticipant(id, body.profileId);
+
+    if (await textViolatesPolicy(body.text)) {
+      return reply.status(422).send(REJECTED_CONTENT_ERROR);
+    }
 
     const [message] = await prisma.$transaction([
       prisma.directMessage.create({

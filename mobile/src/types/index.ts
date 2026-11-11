@@ -49,6 +49,7 @@ export interface Profile {
   notifyWayRequests: boolean;
   notifyCameraRequests: boolean;
   notifyProfileAccessRequests: boolean;
+  notifyDigest: boolean;
   actualLat: number | null;
   actualLng: number | null;
   displayLat: number | null;
@@ -85,6 +86,17 @@ export interface NearbyResult {
 }
 
 export type SearchMode = "nearby" | "address" | "location" | "wayid" | "all";
+
+// Result of parsing a natural-language search query (see api/search.ts's
+// parseSearchQuery) into the same fields the manual search UI produces.
+export interface ParsedSearchIntent {
+  mode: SearchMode;
+  describe: string | null;
+  radiusMeters: number | null;
+  locationQuery: string | null;
+  wayIdQuery: string | null;
+  allQuery: string | null;
+}
 export type ResultView = "radar" | "list" | "grid";
 
 export type ProfileAccessLevel = "full" | "restricted";
@@ -130,6 +142,14 @@ export interface ProfileSummary {
   displayName: string;
   displayPictureUrl: string | null;
   isVerified: boolean;
+}
+
+// A "people you may want to connect with" suggestion (GET
+// /way-requests/recommendations/:profileId) — reason is a short,
+// rule-based explanation (e.g. "2 mutual connections"), not freeform text.
+export interface ConnectRecommendation {
+  profile: ProfileSummary & { kind: "personal" | "business" | "podcast" };
+  reason: string;
 }
 
 // A row in GET /profiles/:id/followers or /following — a profile summary
@@ -193,6 +213,8 @@ export type EpisodeType = "audio" | "video";
 
 // Podcast-profile content (profile-kind feature phase 4) — a separate model
 // from Post; only a profile with kind "podcast" can own these.
+export type TranscriptStatus = "none" | "pending" | "ready" | "failed";
+
 export interface Episode {
   id: string;
   profileId: string;
@@ -207,6 +229,9 @@ export interface Episode {
   sharesCount: number;
   viewerLiked: boolean;
   createdAt: string;
+  transcript: string | null;
+  showNotes: string | null;
+  transcriptStatus: TranscriptStatus;
 }
 
 export interface EpisodeComment {
@@ -335,6 +360,14 @@ export interface DirectMessage {
   text: string | null;
   mediaUrl: string | null;
   mediaType: "image" | "video" | null;
+  createdAt: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant";
+  text: string;
   createdAt: string;
 }
 

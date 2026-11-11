@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { SearchMode, WayRequest } from "../types";
+import type { ConnectRecommendation, SearchMode, WayRequest } from "../types";
 
 export function sendWayRequest(input: {
   fromProfileId: string;
@@ -22,6 +22,10 @@ export function getIncomingWayRequests(profileId: string) {
 
 export function getOutgoingWayRequests(profileId: string) {
   return api.get<WayRequest[]>(`/way-requests/outgoing/${profileId}`);
+}
+
+export function getConnectRecommendations(profileId: string) {
+  return api.get<ConnectRecommendation[]>(`/way-requests/recommendations/${profileId}`);
 }
 
 export function acceptWayRequest(id: string, profileId: string) {

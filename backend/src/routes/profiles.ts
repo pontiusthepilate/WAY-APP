@@ -6,8 +6,29 @@ import { syncProfileLocation } from "../lib/geo";
 import { isValidWayId, normalizeWayId } from "../lib/wayId";
 import { autoFollowDefaultProfile } from "../lib/defaultProfiles";
 import { computeProfileAccessLevel, restrictedProfileView } from "../lib/profileAccess";
+import { embedText } from "../lib/voyage";
+import { suggestWhichWay } from "../lib/profileSuggestions";
 
 const FREE_PROFILE_LIMIT = 2;
+const suggestWhichWayBody = z.object({ bio: z.string().min(10).max(280) });
+
+// Keeps Profile.whichWayEmbedding (see lib/voyage.ts, lib/geo.ts) in sync
+// with whichWay whenever it's part of a create/update body. Runs after
+// the main write, never inside a transaction (it's a slow network call),
+// and is always wrapped by its caller in try/catch — a Voyage hiccup
+// must never fail a profile save. `whichWay === undefined` means the
+// field wasn't part of this request at all, so it's left untouched.
+async function syncWhichWayEmbedding(profileId: string, whichWay: string | undefined) {
+  if (whichWay === undefined) return;
+  if (!whichWay) {
+    await prisma.profile.update({ where: { id: profileId }, data: { whichWayEmbedding: [] } });
+    return;
+  }
+  const embedding = await embedText(whichWay, "document");
+  if (embedding) {
+    await prisma.profile.update({ where: { id: profileId }, data: { whichWayEmbedding: embedding } });
+  }
+}
 
 const createProfileBody = z.object({
   wayId: z.string().min(3).max(20),
@@ -65,6 +86,7 @@ const notificationPrefsBody = z.object({
   notifyLive: z.boolean().optional(),
   notifyWayRequests: z.boolean().optional(),
   notifyCameraRequests: z.boolean().optional(),
+  notifyDigest: z.boolean().optional(),
 });
 
 const privacyBody = z.object({
@@ -84,6 +106,15 @@ export async function profileRoutes(app: FastifyInstance) {
   app.get("/profiles/me", { onRequest: [app.authenticate] }, async (req) => {
     const { userId } = requireUser(req);
     return prisma.profile.findMany({ where: { userId }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] });
+  });
+
+  // Stateless text-in/text-out — doesn't touch any specific profile's
+  // row, so no assertOwnsProfile needed, just being signed in. See
+  // lib/profileSuggestions.ts; category suggestion from the same bio
+  // happens entirely client-side via lib/categoryMatch.ts's matchCategories.
+  app.post("/profiles/suggest-which-way", { onRequest: [app.authenticate] }, async (req) => {
+    const { bio } = suggestWhichWayBody.parse(req.body);
+    return { whichWay: await suggestWhichWay(bio) };
   });
 
   app.post("/profiles", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -143,6 +174,11 @@ export async function profileRoutes(app: FastifyInstance) {
       }
       return created;
     });
+    try {
+      await syncWhichWayEmbedding(profile.id, body.whichWay);
+    } catch (err) {
+      app.log.warn({ err, profileId: profile.id }, "whichWay embedding failed");
+    }
     reply.status(201).send(profile);
   });
 
@@ -188,7 +224,13 @@ export async function profileRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     await assertOwnsProfile(userId, id);
     const body = updateProfileBody.parse(req.body);
-    return prisma.profile.update({ where: { id }, data: body });
+    const updated = await prisma.profile.update({ where: { id }, data: body });
+    try {
+      await syncWhichWayEmbedding(id, body.whichWay);
+    } catch (err) {
+      app.log.warn({ err, profileId: id }, "whichWay embedding failed");
+    }
+    return updated;
   });
 
   app.patch("/profiles/:id/visibility", { onRequest: [app.authenticate] }, async (req) => {
