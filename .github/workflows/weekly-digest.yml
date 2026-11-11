@@ -1,0 +1,15 @@
+name: Weekly digest
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Monday 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  send-digests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly digest send
+        run: |
+          curl -f -X POST https://app.wwwaaayyy.com/admin/send-digests \
+            -H "X-Admin-Secret: ${{ secrets.ADMIN_API_SECRET }}"
