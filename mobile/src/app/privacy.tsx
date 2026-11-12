@@ -103,8 +103,11 @@ export default function PrivacyScreen() {
         <Switch value={activeProfile.discoverableByPhone} onValueChange={toggleDiscoverableByPhone} />
       </View>
       <Text style={styles.sectionHint}>
-        Your actual number is never shown here — only to someone you&apos;ve connected with, and only if you choose
-        to share it with them specifically, from their own profile page.
+        This only controls whether someone searching by phone number can find your WAY — it doesn&apos;t reveal your
+        number to anyone. Your actual number is never shown automatically to a WAY ID, Nearby, Address, or Location
+        connection either. To let one specific connection see it: open their profile (tap their name anywhere, or
+        find them under Followers/Following) and turn on &quot;Share my phone number with them&quot; — that switch
+        only appears once you&apos;re connected, right below their name.
       </Text>
 
       <Text style={[styles.sectionLabel, styles.secondSectionLabel]}>
