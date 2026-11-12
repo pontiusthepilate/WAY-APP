@@ -540,7 +540,7 @@ export default function SearchScreen() {
             <Ionicons name="home-outline" size={20} color={colors.textSecondary} />
           </Pressable>
           <Pressable onPress={() => setMapPickerOpen(true)} hitSlop={8} accessibilityLabel="Pick on map">
-            <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
+            <Ionicons name="location-outline" size={20} color={colors.textSecondary} />
           </Pressable>
           <Pressable onPress={() => router.push("/scan")} hitSlop={8} accessibilityLabel="Scan QR">
             <Ionicons name="qr-code-outline" size={20} color={colors.textSecondary} />
