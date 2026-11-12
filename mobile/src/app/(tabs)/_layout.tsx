@@ -33,7 +33,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
+          title: "Connect",
           tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline" size={size} color={color} />,
         }}
       />
