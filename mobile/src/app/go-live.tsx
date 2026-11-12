@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
@@ -10,9 +11,11 @@ import { createLiveSession } from "../api/live";
 import { ApiError } from "../api/client";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
 import { DotOutline } from "../components/DotOutline";
+import { safeBack } from "../lib/navigation";
 
 export default function GoLiveScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { activeProfile } = useSession();
   const [permission, requestPermission] = useCameraPermissions();
   const [title, setTitle] = useState("");
@@ -43,6 +46,15 @@ export default function GoLiveScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Go Live</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.body}>
       <View style={styles.previewWrap}>
         {permission?.granted ? (
           <CameraView style={styles.preview} facing="front" />
@@ -106,12 +118,22 @@ export default function GoLiveScreen() {
         Your followers will get a notification{scheduling ? " when you schedule this" : " that you're live"}. Video
         streaming to viewers is coming soon — this preview is local to your device for now.
       </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   previewWrap: {
     width: "100%",
     aspectRatio: 3 / 4,
