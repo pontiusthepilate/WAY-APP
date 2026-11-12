@@ -4,6 +4,7 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -468,7 +469,7 @@ export default function SearchScreen() {
       <SkyOceanBackground tone="pale" />
       <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <View>
-          <Text style={styles.headerTitle}>WAY</Text>
+          <Image source={require("../../../assets/way-mark.png")} style={styles.headerLogo} resizeMode="contain" />
           <Text style={styles.headerSubtitle}>{activeProfile ? activeProfile.wayId : ""}</Text>
         </View>
         <View style={styles.visibilityRow}>
@@ -733,7 +734,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
-  headerTitle: { ...typography.h1, color: colors.primaryDark },
+  headerLogo: { width: 52, height: 52, marginBottom: 2 },
   headerSubtitle: { ...typography.caption, color: colors.textSecondary },
   visibilityRow: { alignItems: "center" },
   visibilityLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 2 },

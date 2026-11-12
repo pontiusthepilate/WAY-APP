@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { TransactionRow } from "../../components/TransactionRow";
@@ -44,7 +44,10 @@ export default function WalletScreen() {
       renderItem={({ item }) => <TransactionRow tx={item} />}
       ListHeaderComponent={
         <View>
-          <Text style={styles.headerTitle}>Wallet</Text>
+          <View style={styles.headerRow}>
+            <Image source={require("../../../assets/way-mark.png")} style={styles.headerLogo} resizeMode="contain" />
+            <Text style={styles.headerTitle}>Wallet</Text>
+          </View>
 
           {balances.length === 0 ? (
             <View style={styles.emptyBalanceCard}>
@@ -93,7 +96,9 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   container: { flex: 1 },
   listPadding: { paddingBottom: 110 },
-  headerTitle: { ...typography.h1, color: colors.primaryDark, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  headerRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  headerLogo: { width: 52, height: 52, marginBottom: 2 },
+  headerTitle: { ...typography.h1, color: colors.primaryDark },
   balanceRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm },
   balanceCard: {
     backgroundColor: colors.primaryDark,

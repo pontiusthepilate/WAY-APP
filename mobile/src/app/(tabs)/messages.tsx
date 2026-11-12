@@ -32,7 +32,10 @@ export default function MessagesScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={[styles.title, { paddingTop: spacing.lg + insets.top }]}>Messages</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Image source={require("../../../assets/way-mark.png")} style={styles.headerLogo} resizeMode="contain" />
+        <Text style={styles.title}>Messages</Text>
+      </View>
 
       <FlatList
         data={conversations}
@@ -63,7 +66,9 @@ export default function MessagesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  title: { ...typography.h1, color: colors.primaryDark, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  headerLogo: { width: 52, height: 52, marginBottom: 2 },
+  title: { ...typography.h1, color: colors.primaryDark },
   listPadding: { paddingBottom: 110, paddingHorizontal: spacing.lg },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm },
   avatar: { width: 52, height: 52, borderRadius: radii.pill, backgroundColor: colors.primaryLight },
