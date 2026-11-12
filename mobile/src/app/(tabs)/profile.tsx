@@ -385,7 +385,7 @@ export default function ProfileScreen() {
           <View style={styles.menuCard}>
             <Pressable style={styles.menuItem} onPress={handlePickPicture}>
               <Ionicons name="image-outline" size={18} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{activeProfile.displayPictureUrl ? "Edit photo" : "Add photo"}</Text>
+              <Text style={styles.menuItemText}>{activeProfile.displayPictureUrl ? "Change photo" : "Add photo"}</Text>
             </Pressable>
             {activeProfile.displayPictureUrl && (
               <Pressable style={styles.menuItem} onPress={handleRemovePicture}>
