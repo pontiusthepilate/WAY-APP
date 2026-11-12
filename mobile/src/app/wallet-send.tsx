@@ -28,8 +28,10 @@ export default function WalletSendScreen() {
   const load = useCallback(async () => {
     if (!activeProfile) return;
     const wallet = await getWallet(activeProfile.id);
-    setBalances(wallet.balances);
-    setCurrency((prev) => prev ?? wallet.balances[0]?.currency ?? null);
+    // NGN-only wallet — see backend/src/lib/currency.ts.
+    const ngnBalances = wallet.balances.filter((b) => b.currency === "NGN");
+    setBalances(ngnBalances);
+    setCurrency((prev) => prev ?? ngnBalances[0]?.currency ?? null);
   }, [activeProfile]);
 
   useFocusEffect(

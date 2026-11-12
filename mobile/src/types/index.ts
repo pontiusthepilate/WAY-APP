@@ -278,7 +278,7 @@ export interface Comment {
 
 export type AutoScrollSpeed = "off" | "slow" | "medium" | "fast";
 
-export const CURRENCIES = ["USD", "NGN", "EUR", "GBP"] as const;
+export const CURRENCIES = ["NGN"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
 export interface WalletBalance {

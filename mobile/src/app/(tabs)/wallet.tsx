@@ -23,7 +23,9 @@ export default function WalletScreen() {
       getWallet(activeProfile.id),
       getTransactions({ profileId: activeProfile.id, limit: 5 }),
     ]);
-    setBalances(wallet.balances);
+    // NGN-only wallet — see backend/src/lib/currency.ts. Filtering here too
+    // keeps any pre-existing non-NGN test balances from ever surfacing.
+    setBalances(wallet.balances.filter((b) => b.currency === "NGN"));
     setRecent(history.transactions);
   }, [activeProfile]);
 

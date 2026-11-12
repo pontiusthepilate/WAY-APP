@@ -1,7 +1,8 @@
-// Currencies the wallet accepts. All amounts are minor units (cents/kobo) —
-// every one of these happens to use a 2-decimal minor unit, so no per-currency
-// exponent table is needed yet. Add one if a 0- or 3-decimal currency joins.
-export const ALLOWED_CURRENCIES = ["USD", "NGN", "EUR", "GBP"] as const;
+// Currencies the wallet accepts. NGN-only — Termii rejected our Sender ID
+// request because the site showed multiple currencies (USD/EUR/GBP) on a
+// wallet, which reads as international operation; this is now Naira-only.
+// All amounts are minor units (kobo).
+export const ALLOWED_CURRENCIES = ["NGN"] as const;
 export type Currency = (typeof ALLOWED_CURRENCIES)[number];
 
 export function isAllowedCurrency(value: string): value is Currency {

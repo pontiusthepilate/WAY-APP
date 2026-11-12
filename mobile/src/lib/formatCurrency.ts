@@ -1,10 +1,7 @@
 import type { Currency } from "../types";
 
 const LOCALE_BY_CURRENCY: Record<Currency, string> = {
-  USD: "en-US",
   NGN: "en-NG",
-  EUR: "de-DE",
-  GBP: "en-GB",
 };
 
 export function formatCurrency(amountMinor: number, currency: Currency): string {

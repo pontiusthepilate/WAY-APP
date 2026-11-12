@@ -7,7 +7,7 @@ import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { fundWallet, verifyFunding } from "../api/wallet";
 import { toMinorUnits } from "../lib/formatCurrency";
-import { CURRENCIES, type Currency } from "../types";
+import type { Currency } from "../types";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
 import { SkyOceanBackground } from "../components/SkyOceanBackground";
@@ -18,16 +18,13 @@ const METHODS: { key: "card" | "crypto"; label: string }[] = [
   { key: "crypto", label: "Crypto" },
 ];
 
-// Real card funding (Paystack) is only live for NGN right now — see
-// backend/src/lib/paystack.ts. Other currencies still use the simulated
-// instant-credit path the backend falls back to automatically.
-const REAL_FUNDING_CURRENCIES: Currency[] = ["NGN"];
+// NGN-only wallet — see backend/src/lib/currency.ts.
+const CURRENCY: Currency = "NGN";
 const PAYSTACK_REDIRECT_URL = "way://wallet-fund-callback";
 
 export default function WalletFundScreen() {
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
-  const [currency, setCurrency] = useState<Currency>("USD");
   const [method, setMethod] = useState<"card" | "crypto">("card");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,14 +32,14 @@ export default function WalletFundScreen() {
 
   const parsedAmount = parseFloat(amount);
   const isValid = !Number.isNaN(parsedAmount) && parsedAmount > 0;
-  const isRealFunding = method === "card" && REAL_FUNDING_CURRENCIES.includes(currency);
+  const isRealFunding = method === "card";
 
   async function handleFund() {
     if (!activeProfile || !isValid) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await fundWallet({ profileId: activeProfile.id, currency, amount: toMinorUnits(parsedAmount), method });
+      const result = await fundWallet({ profileId: activeProfile.id, currency: CURRENCY, amount: toMinorUnits(parsedAmount), method });
 
       if (result.status === "completed") {
         safeBack("/wallet");
@@ -87,16 +84,7 @@ export default function WalletFundScreen() {
       </View>
 
       <View style={styles.body}>
-      <Text style={styles.label}>Currency</Text>
-      <View style={styles.chipRow}>
-        {CURRENCIES.map((c) => (
-          <Pressable key={c} style={[styles.chip, currency === c && styles.chipActive]} onPress={() => setCurrency(c)}>
-            <Text style={[styles.chipLabel, currency === c && styles.chipLabelActive]}>{c}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Amount</Text>
+      <Text style={styles.label}>Amount (NGN)</Text>
       <View style={styles.inputWrap}>
         <Ionicons name="cash-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
         <TextInput
@@ -120,12 +108,6 @@ export default function WalletFundScreen() {
       {method === "crypto" && (
         <Text style={styles.notice}>Crypto funding is coming soon. You can still fund with a card today.</Text>
       )}
-      {method === "card" && !isRealFunding && (
-        <Text style={styles.notice}>
-          Real card funding is live for NGN. {currency} still uses a simulated top-up for now.
-        </Text>
-      )}
-
       {error && <Text style={styles.error}>{error}</Text>}
 
       <DotOutline radius={radii.pill} tone="onDark" style={styles.buttonSpacing}>
@@ -164,14 +146,6 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: spacing.xl },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
-  chip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
   methodChip: {
     flex: 1,
     paddingVertical: spacing.sm,
