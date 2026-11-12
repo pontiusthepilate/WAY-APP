@@ -5,7 +5,7 @@ import { requireUser, assertOwnsProfile } from "../lib/auth";
 import { syncProfileLocation } from "../lib/geo";
 import { isValidWayId, normalizeWayId } from "../lib/wayId";
 import { autoFollowDefaultProfile } from "../lib/defaultProfiles";
-import { computeProfileAccessLevel, restrictedProfileView } from "../lib/profileAccess";
+import { computeProfileAccessLevel, restrictedProfileView, getConnection } from "../lib/profileAccess";
 import { embedText } from "../lib/voyage";
 import { suggestWhichWay } from "../lib/profileSuggestions";
 
@@ -38,6 +38,10 @@ const createProfileBody = z.object({
   whichWay: z.string().max(150).optional(),
   categories: z.array(z.string().min(1).max(30)).max(10).default([]),
   kind: z.enum(["personal", "business", "podcast"]).default("personal"),
+  // Surfaced as a 2-switch section on the signup screen itself (not just
+  // buried in Privacy later) — see create-profile.tsx.
+  discoverableByPhone: z.boolean().optional(),
+  sharePhoneNumber: z.boolean().optional(),
 });
 
 const updateProfileBody = z.object({
@@ -71,6 +75,8 @@ const visibilityBody = z.object({
   visibleToLocation: z.boolean().optional(),
   visibilityText: z.string().max(140).optional(),
   visibilityImageUrl: z.string().url().optional(),
+  discoverableByPhone: z.boolean().optional(),
+  sharePhoneNumber: z.boolean().optional(),
 });
 
 const linksBody = z.object({
@@ -216,7 +222,53 @@ export async function profileRoutes(app: FastifyInstance) {
     const owner = await prisma.profile.findUnique({ where: { id } });
     if (!owner) return reply.status(404).send({ error: "Not found" });
     const accessLevel = await computeProfileAccessLevel(viewerProfileId, owner);
-    reply.send({ accessLevel, profile: accessLevel === "full" ? owner : restrictedProfileView(owner) });
+
+    // Both discoveredVia and the phone-number reveal are per-connection —
+    // they key off the actual accepted WayRequest between these two
+    // specific profiles (never set when "full" came from a
+    // ProfileAccessRequest instead, since there's no such row then).
+    let isConnected = false;
+    let discoveredVia: string | null = null;
+    let phoneNumber: string | null = null;
+    let sharingMyPhone = false;
+    if (viewerProfileId !== owner.id) {
+      const connection = await getConnection(viewerProfileId, owner.id);
+      if (connection) {
+        isConnected = true;
+        discoveredVia = connection.discoveredVia;
+        const ownerShares = connection.fromProfileId === owner.id ? connection.fromSharesPhone : connection.toSharesPhone;
+        sharingMyPhone = connection.fromProfileId === viewerProfileId ? connection.fromSharesPhone : connection.toSharesPhone;
+        if (ownerShares) {
+          const ownerUser = await prisma.user.findUnique({ where: { id: owner.userId }, select: { phone: true } });
+          phoneNumber = ownerUser?.phone ?? null;
+        }
+      }
+    }
+
+    reply.send({
+      accessLevel,
+      profile: accessLevel === "full" ? owner : restrictedProfileView(owner),
+      isConnected,
+      discoveredVia,
+      phoneNumber,
+      sharingMyPhone,
+    });
+  });
+
+  // The viewer's own phone-sharing decision for this one connection — set
+  // inline at accept time (see POST /way-requests/:id/accept) or changed
+  // anytime afterward from here, which is what this route is for.
+  const sharePhoneBody = z.object({ viewerProfileId: z.string(), share: z.boolean() });
+  app.patch("/profiles/:id/share-phone", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { userId } = requireUser(req);
+    const { id } = req.params as { id: string };
+    const body = sharePhoneBody.parse(req.body);
+    await assertOwnsProfile(userId, body.viewerProfileId);
+    const connection = await getConnection(id, body.viewerProfileId);
+    if (!connection) return reply.status(404).send({ error: "You're not connected to this profile" });
+    const field = connection.fromProfileId === body.viewerProfileId ? "fromSharesPhone" : "toSharesPhone";
+    await prisma.wayRequest.update({ where: { id: connection.id }, data: { [field]: body.share } });
+    reply.send({ share: body.share });
   });
 
   app.patch("/profiles/:id", { onRequest: [app.authenticate] }, async (req) => {

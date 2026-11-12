@@ -98,6 +98,12 @@ const UNIFIED_RESULT_LIMIT = 10;
 // A WAY-ID lookup result has no meaningful distance/bearing — it's an exact
 // handle/phone match, not a geo search — so it's shaped like NearbyResult
 // minus those two fields.
+// A WAY-ID lookup result has no meaningful distance/bearing — it's an exact
+// handle/phone match, not a geo search — so it's shaped like NearbyResult
+// minus those two fields. Deliberately never carries a phone number: that's
+// never revealed at search time (no connection exists yet to consent to
+// it) — only on the full-profile page of someone you're already connected
+// to, per-connection, see routes/profiles.ts and lib/profileAccess.ts.
 const LOOKUP_SELECT = {
   id: true,
   wayId: true,
@@ -203,10 +209,14 @@ export async function searchRoutes(app: FastifyInstance) {
   // phone number. Unlike the three geo modes above, this isn't discovery —
   // the searcher already has a specific handle or number in hand — so it
   // intentionally ignores visibleToNearby/Address/Location and only respects
-  // the master isVisible switch. A phone number can own more than one
-  // profile (each account gets up to FREE_PROFILE_LIMIT), so that branch can
-  // return multiple results; a WayID is globally unique, so it returns at
-  // most one.
+  // the master isVisible switch (plus discoverableByPhone, specifically for
+  // the phone-number branch — see Profile's own doc comment). A phone
+  // number can own more than one profile (each account gets up to
+  // FREE_PROFILE_LIMIT), so that branch can return multiple results; a
+  // WayID is globally unique, so it returns at most one. Neither branch
+  // ever reveals the found account's own phone number — there's no
+  // connection yet at search time, so nobody's consented to that; see
+  // routes/profiles.ts's GET /profiles/:id for the per-connection reveal.
   app.get("/search/way-id", { onRequest: [app.authenticate] }, async (req) => {
     const q = wayIdQuery.parse(req.query);
     const raw = q.query.trim().replace(/^way\//i, "").trim();
@@ -217,11 +227,10 @@ export async function searchRoutes(app: FastifyInstance) {
       const phone = raw.replace(/[\s\-().]/g, "");
       const user = await prisma.user.findUnique({ where: { phone } });
       if (!user) return [];
-      const profiles = await prisma.profile.findMany({
-        where: { userId: user.id, isVisible: true, id: { not: q.profileId, notIn: suppressed } },
+      return prisma.profile.findMany({
+        where: { userId: user.id, isVisible: true, discoverableByPhone: true, id: { not: q.profileId, notIn: suppressed } },
         select: LOOKUP_SELECT,
       });
-      return profiles;
     }
 
     const profile = await prisma.profile.findFirst({

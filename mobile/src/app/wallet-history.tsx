@@ -76,7 +76,6 @@ export default function WalletHistoryScreen() {
       <View style={styles.filterRow}>
         <View style={styles.wayInputWrap}>
           <Ionicons name="at-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-          <Text style={styles.wayPrefix}>WAY/</Text>
           <TextInput
             style={styles.wayInput}
             placeholder="Filter by person"
@@ -109,7 +108,7 @@ export default function WalletHistoryScreen() {
         ListEmptyComponent={
           !loading ? (
             <Text style={styles.empty}>
-              {appliedFilter ? `No transactions with WAY/${appliedFilter} yet.` : "No transactions yet."}
+              {appliedFilter ? `No transactions with ${appliedFilter} yet.` : "No transactions yet."}
             </Text>
           ) : null
         }
@@ -143,7 +142,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   inputIcon: { marginRight: spacing.xs },
-  wayPrefix: { ...typography.body, color: colors.primaryDark, fontWeight: "700" },
   wayInput: { flex: 1, paddingVertical: spacing.sm, ...typography.body, color: colors.textPrimary },
   filterButton: {
     flexDirection: "row",

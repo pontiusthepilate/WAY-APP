@@ -140,7 +140,7 @@ export default function AdminVerificationScreen() {
                   <Avatar uri={item.profile?.displayPictureUrl ?? null} displayName={item.profile?.displayName ?? "?"} size={36} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardName}>{item.profile?.displayName ?? "Unknown"}</Text>
-                    <Text style={styles.cardSub}>WAY/{item.profile?.wayId}</Text>
+                    <Text style={styles.cardSub}>{item.profile?.wayId}</Text>
                   </View>
                   {item.isOverdue && (
                     <View style={styles.overdueBadge}>

@@ -66,7 +66,7 @@ export default function CameraRequestScreen() {
       <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Camera Access Request</Text>
       <Text style={styles.subtitle}>
-        {request.fromProfile?.displayName ?? "Someone"} (WAY/{request.fromProfile?.wayId}) wants to see your camera
+        {request.fromProfile?.displayName ?? "Someone"} ({request.fromProfile?.wayId}) wants to see your camera
       </Text>
       <Text style={styles.time}>{formatRelativeTime(request.createdAt)}</Text>
 

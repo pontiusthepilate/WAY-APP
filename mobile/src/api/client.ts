@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "./config";
+import { formatDisplayName } from "../lib/displayName";
 
 const TOKEN_KEY = "way.session.token";
 
@@ -23,6 +24,24 @@ export class ApiError extends Error {
   }
 }
 
+// Applies formatDisplayName to every "displayName" field anywhere in a
+// parsed JSON response — one pass here covers every screen that renders a
+// name, instead of a title-casing call at each of the dozens of render
+// sites across the app.
+export function capitalizeDisplayNames<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => capitalizeDisplayNames(item)) as unknown as T;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = key === "displayName" && typeof val === "string" ? formatDisplayName(val) : capitalizeDisplayNames(val);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken();
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -38,7 +57,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   const isJson = res.headers.get("content-type")?.includes("application/json");
-  const body = isJson ? await res.json() : undefined;
+  const rawBody = isJson ? await res.json() : undefined;
+  const body = isJson ? capitalizeDisplayNames(rawBody) : rawBody;
 
   if (!res.ok) {
     throw new ApiError(body?.error ?? res.statusText, res.status);

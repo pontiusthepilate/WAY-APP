@@ -132,16 +132,57 @@ function useBuoyantFloat(seed: number) {
 // The bottom nav, tucked away behind a small arrow instead of always being
 // on screen. Collapsed, it's just the chevron floating over whatever the
 // current screen shows — the full screen is visible, "entire phone screen"
-// as normal. Tap it and a solid panel rises to hold the 5 tabs (the same
-// bobbing row they used to float in permanently); its top border is where
-// the visible screen now ends, with the chevron — flipped to point down —
-// straddling that border, its two legs touching the line from above while
-// its tip dips into the panel. Tap it again to collapse back to the plain
-// floating arrow. Auto-scroll's controls stay on their own independent
-// shake-to-reveal WAY Button (see WayButton.tsx).
+// as normal. Tap it and a solid panel SLIDES UP from below the screen edge
+// to hold the 5 tabs (the same bobbing row they used to float in
+// permanently); its top border is where the visible screen now ends, with
+// the chevron — flipped to point down — straddling that border, its two
+// legs touching the line from above while its tip dips into the panel. Tap
+// it again and the panel slides back down out of view before unmounting
+// (kept mounted for the duration of that closing animation — see
+// `mounted` below — otherwise it would just vanish mid-slide). Auto-
+// scroll's controls stay on their own independent shake-to-reveal WAY
+// Button (see WayButton.tsx).
+const SLIDE_DURATION_OPEN = 600;
+const SLIDE_DURATION_CLOSE = 540;
+// A reasonable guess for the panel's height before it's ever been laid
+// out once (needed so the very first open animation has somewhere to
+// slide up FROM) — slightly tall is harmless since it's off-screen
+// either way; onLayout below replaces it with the real measured height
+// for every toggle after that.
+const INITIAL_PANEL_HEIGHT_GUESS = 180;
+
 export function CollapsibleTabBar({ state, descriptors, navigation, insets }: CollapsibleTabBarProps) {
   const [expanded, setExpanded] = useState(false);
+  // Whether the panel is in the tree at all — stays true for the duration
+  // of the closing slide so it has something to animate, then flips false
+  // once that animation actually finishes.
+  const [mounted, setMounted] = useState(false);
+  const [slideAnim] = useState(() => new Animated.Value(0));
+  const [panelHeight, setPanelHeight] = useState(INITIAL_PANEL_HEIGHT_GUESS);
   const bottomPadding = Math.max(insets.bottom, 10);
+
+  function open() {
+    setExpanded(true);
+    setMounted(true);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: SLIDE_DURATION_OPEN,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }
+
+  function close() {
+    setExpanded(false);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: SLIDE_DURATION_CLOSE,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }
 
   const tabs = state.routes.map((route, index) => {
     const { options } = descriptors[route.key];
@@ -167,37 +208,58 @@ export function CollapsibleTabBar({ state, descriptors, navigation, insets }: Co
     );
   });
 
-  if (expanded) {
-    return (
-      <View style={[styles.panel, { paddingBottom: bottomPadding }]} pointerEvents="box-none">
-        {/* The exact clip onboarding's first 3 screens use, same "deep"
-            wash — the panel reads as an extension of that same ocean. */}
-        <OceanWavesBackground source={require("../../assets/onboarding-waves.mp4")} tone="deep" />
-        <Pressable
-          style={styles.arrowOnBorder}
-          onPress={() => setExpanded(false)}
-          hitSlop={16}
-          accessibilityLabel="Hide navigation"
-        >
-          <BoldChevron direction="down" color={colors.textOnPrimary} />
-        </Pressable>
-        <View style={styles.row} pointerEvents="box-none">
-          {tabs}
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container} pointerEvents="box-none">
-      <Pressable
-        style={[styles.arrowFloating, { marginBottom: bottomPadding }]}
-        onPress={() => setExpanded(true)}
-        hitSlop={16}
-        accessibilityLabel="Show navigation"
-      >
-        <BoldChevron direction="up" color={colors.primary} />
-      </Pressable>
+      {!mounted && (
+        <Pressable
+          style={[styles.arrowFloating, { marginBottom: bottomPadding }]}
+          onPress={open}
+          hitSlop={16}
+          accessibilityLabel="Show navigation"
+        >
+          <BoldChevron direction="up" color={colors.primary} />
+        </Pressable>
+      )}
+      {mounted && (
+        <Animated.View
+          style={[
+            styles.panel,
+            { paddingBottom: bottomPadding },
+            {
+              transform: [
+                {
+                  translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [panelHeight, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+          pointerEvents={expanded ? "box-none" : "none"}
+          onLayout={(e) => {
+            setPanelHeight(e.nativeEvent.layout.height);
+          }}
+        >
+          {/* The exact clip onboarding's first 3 screens use, same "deep"
+              wash — the panel reads as an extension of that same ocean. */}
+          <OceanWavesBackground source={require("../../assets/onboarding-waves.mp4")} tone="deep" />
+          {/* Less hitSlop on the bottom edge specifically — that's the side
+              facing the tab row just below it, where a generous slop would
+              make the arrow and the middle tab's own tap target overlap. */}
+          <Pressable
+            style={styles.arrowOnBorder}
+            onPress={close}
+            hitSlop={{ top: 16, left: 16, right: 16, bottom: 4 }}
+            accessibilityLabel="Hide navigation"
+          >
+            <BoldChevron direction="down" color={colors.primary} />
+          </Pressable>
+          <View style={styles.row} pointerEvents="box-none">
+            {tabs}
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -212,6 +274,16 @@ function FloatingTab({ onPress, seed, children }: { onPress: () => void; seed: n
 }
 
 const ARROW_SIZE = 40;
+// Lands the down-chevron's own vertex (its visual "tip") exactly on the
+// panel's top border instead of dipping into it — mirrors BoldChevron's
+// own `inset` math (its vertex sits CHEVRON_HEIGHT - inset down from the
+// glyph's own top) plus how far that glyph sits inside this centered
+// ARROW_SIZE box, so the two stay in sync if either constant changes.
+const CHEVRON_INSET = CHEVRON_THICKNESS / 2 + 1;
+// A small extra nudge upward past "tip exactly on the border", requested
+// on top of that base position — tune here.
+const DOWN_ARROW_EXTRA_LIFT = 6;
+const DOWN_ARROW_BOX_TOP = -((CHEVRON_HEIGHT - CHEVRON_INSET) + (ARROW_SIZE - CHEVRON_HEIGHT) / 2 + DOWN_ARROW_EXTRA_LIFT);
 
 const styles = StyleSheet.create({
   container: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center" },
@@ -253,13 +325,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
-  // Straddles the panel's own top border — negative top offset by half its
-  // height pulls it up so the chevron's two legs sit right on the border
-  // line (reading as touching it) while its downward tip dips just inside
-  // the panel.
+  // Straddles the panel's own top border — positioned so the chevron's
+  // downward tip lands exactly on the border line rather than dipping
+  // into the panel, which also keeps its (hitSlop-expanded) tap target
+  // from reaching down into the tab row below it.
   arrowOnBorder: {
     position: "absolute",
-    top: -(ARROW_SIZE / 2) + 12,
+    top: DOWN_ARROW_BOX_TOP,
     left: "50%",
     marginLeft: -(ARROW_SIZE + 8) / 2,
     width: ARROW_SIZE + 8,

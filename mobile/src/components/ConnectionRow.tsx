@@ -19,7 +19,7 @@ export function ConnectionRow({
       <Avatar uri={result.displayPictureUrl} displayName={result.displayName} size={48} hasActiveStatus={hasActiveStatus} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{result.displayName}</Text>
-        <Text style={styles.way} numberOfLines={1}>WAY/{result.wayId}</Text>
+        <Text style={styles.way} numberOfLines={1}>{result.wayId}</Text>
         {result.whichWay && <Text style={styles.teaser} numberOfLines={1}>{result.whichWay}</Text>}
       </View>
       <Text style={styles.distance}>{formatDistance(result.distanceMeters)}</Text>

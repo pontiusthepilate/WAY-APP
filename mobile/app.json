@@ -15,7 +15,9 @@
           "audio",
           "voip"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "WAY needs speech recognition access to generate live captions during calls.",
+        "NSMicrophoneUsageDescription": "WAY needs microphone access to generate live captions during calls."
       },
       "entitlements": {
         "aps-environment": "development"
@@ -110,6 +112,12 @@
         "projectId": "9028baa9-cdcc-4559-9abc-59580739098f"
       }
     },
-    "owner": "wayapp"
+    "owner": "wayapp",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9028baa9-cdcc-4559-9abc-59580739098f"
+    }
   }
 }

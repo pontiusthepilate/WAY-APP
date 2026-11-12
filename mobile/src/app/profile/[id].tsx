@@ -1,21 +1,30 @@
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
-import { getProfileView } from "../../api/profiles";
+import { getProfileView, shareMyPhoneWith } from "../../api/profiles";
 import { Avatar } from "../../components/Avatar";
 import { FollowButton } from "../../components/FollowButton";
 import { PageBackground } from "../../components/PageBackground";
 import { formatProfileHandle } from "../../lib/profileHandle";
 import { safeBack } from "../../lib/navigation";
-import type { Profile, ProfileViewResult, RestrictedProfileView, SearchMode } from "../../types";
+import type { DiscoveredVia, Profile, ProfileViewResult, RestrictedProfileView } from "../../types";
 
 const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   business: "shield-checkmark-outline",
   podcast: "mic-outline",
+};
+
+const DISCOVERED_VIA_LABEL: Record<DiscoveredVia, string> = {
+  nearby: "Nearby",
+  address: "Address search",
+  location: "Location search",
+  wayid: "WAY ID",
+  all: "Search",
+  qr: "QR code",
 };
 
 function isFullProfile(profile: Profile | RestrictedProfileView): profile is Profile {
@@ -28,7 +37,7 @@ function isFullProfile(profile: Profile | RestrictedProfileView): profile is Pro
 // equivalent) or full field set depending on what GET /profiles/:id
 // returns, computed server-side by computeProfileAccessLevel.
 export default function ProfilePageScreen() {
-  const { id, discoveredVia } = useLocalSearchParams<{ id: string; discoveredVia?: SearchMode }>();
+  const { id, discoveredVia } = useLocalSearchParams<{ id: string; discoveredVia?: DiscoveredVia }>();
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -54,6 +63,12 @@ export default function ProfilePageScreen() {
     });
   }
 
+  async function togglePhoneSharing(next: boolean) {
+    if (!id || !activeProfile) return;
+    await shareMyPhoneWith(id, activeProfile.id, next);
+    load();
+  }
+
   function openRequestAccess() {
     if (!view) return;
     router.push({
@@ -71,7 +86,7 @@ export default function ProfilePageScreen() {
     );
   }
 
-  const { accessLevel, profile } = view;
+  const { accessLevel, profile, isConnected, discoveredVia: connectionDiscoveredVia, phoneNumber, sharingMyPhone } = view;
   const isSelf = profile.id === activeProfile.id;
   const isDefault = profile.isDefault;
 
@@ -111,6 +126,24 @@ export default function ProfilePageScreen() {
         {profile.whichWay && (
           <View style={styles.whichWayBox}>
             <Text style={styles.whichWayText}>{profile.whichWay}</Text>
+          </View>
+        )}
+
+        {isConnected && !isSelf && (
+          <View style={styles.connectionBox}>
+            {connectionDiscoveredVia && (
+              <Text style={styles.connectionHint}>{DISCOVERED_VIA_LABEL[connectionDiscoveredVia]}</Text>
+            )}
+            {phoneNumber && (
+              <View style={styles.phoneRow}>
+                <Ionicons name="call-outline" size={14} color={colors.textSecondary} />
+                <Text style={styles.phoneText}>{phoneNumber}</Text>
+              </View>
+            )}
+            <View style={styles.shareRow}>
+              <Text style={styles.shareLabel}>Share my phone number with them</Text>
+              <Switch value={sharingMyPhone} onValueChange={togglePhoneSharing} />
+            </View>
           </View>
         )}
 
@@ -192,6 +225,19 @@ const styles = StyleSheet.create({
   followRow: { marginTop: spacing.sm },
   whichWayBox: { marginTop: spacing.sm, paddingHorizontal: spacing.md },
   whichWayText: { ...typography.body, color: colors.textPrimary, textAlign: "center" },
+  connectionBox: {
+    width: "100%",
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  connectionHint: { ...typography.caption, color: colors.textSecondary, textAlign: "center" },
+  phoneRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
+  phoneText: { ...typography.body, color: colors.textPrimary },
+  shareRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
+  shareLabel: { ...typography.caption, color: colors.textSecondary, flex: 1, marginRight: spacing.sm },
   statsRow: { flexDirection: "row", marginTop: spacing.md, gap: spacing.lg },
   stat: { alignItems: "center" },
   statValue: { ...typography.h3, color: colors.textPrimary },

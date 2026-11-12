@@ -13,10 +13,21 @@ export interface PlaceSuggestion {
   name: string;
   placeFormatted?: string;
   fullAddress?: string;
+  // Mapbox's own classification of the result ("address"/"street" for a
+  // precise street-level result, "place"/"locality"/"region"/"country"/
+  // "poi"/etc. for a broader place) — used to decide address vs. location
+  // search for a tapped suggestion without a second classification step.
+  featureType?: string;
 }
 
 interface SuggestResponse {
-  suggestions: { mapbox_id: string; name: string; place_formatted?: string; full_address?: string }[];
+  suggestions: {
+    mapbox_id: string;
+    name: string;
+    place_formatted?: string;
+    full_address?: string;
+    feature_type?: string;
+  }[];
 }
 
 interface RetrieveResponse {
@@ -58,6 +69,7 @@ export async function suggestPlaces(
     name: s.name,
     placeFormatted: s.place_formatted,
     fullAddress: s.full_address,
+    featureType: s.feature_type,
   }));
 }
 

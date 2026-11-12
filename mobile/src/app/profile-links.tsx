@@ -63,7 +63,7 @@ export default function ProfileLinksScreen() {
 
       {activeProfile && (
         <Text style={styles.subtitle}>
-          Choose which of your other profiles show as a link on WAY/{activeProfile.wayId}.
+          Choose which of your other profiles show as a link on {activeProfile.wayId}.
         </Text>
       )}
 
@@ -81,7 +81,7 @@ export default function ProfileLinksScreen() {
                 )}
                 <Text style={styles.name}>{item.displayName}</Text>
               </View>
-              <Text style={styles.wayId}>WAY/{item.wayId}</Text>
+              <Text style={styles.wayId}>{item.wayId}</Text>
             </View>
             <Switch
               value={linkedIds.has(item.id)}

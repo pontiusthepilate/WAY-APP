@@ -28,6 +28,12 @@ export interface Profile {
   visibleToLocation: boolean;
   visibilityText: string | null;
   visibilityImageUrl: string | null;
+  // Can someone who has this account's phone number find this profile at
+  // all — the only general/blanket phone-privacy setting. Whether a found
+  // or connected profile's actual number is shown is never general; see
+  // WayRequest's discoveredVia/fromSharesPhone/toSharesPhone and
+  // ProfileViewResult's phoneNumber/sharingMyPhone below.
+  discoverableByPhone: boolean;
 
   // Auto-grant-full-profile-access rules (feature: profile access) —
   // evaluated only for an accepted connector, see profileAccess docs on
@@ -87,6 +93,11 @@ export interface NearbyResult {
 
 export type SearchMode = "nearby" | "address" | "location" | "wayid" | "all";
 
+// How a connection was discovered — every SearchMode plus "qr" (scanning a
+// QR code isn't a search mode/tab, but is a trackable discovery source for
+// WayRequest.discoveredVia).
+export type DiscoveredVia = SearchMode | "qr";
+
 // Result of parsing a natural-language search query (see api/search.ts's
 // parseSearchQuery) into the same fields the manual search UI produces.
 export interface ParsedSearchIntent {
@@ -121,6 +132,19 @@ export interface RestrictedProfileView {
 export interface ProfileViewResult {
   accessLevel: ProfileAccessLevel;
   profile: Profile | RestrictedProfileView;
+  // isConnected and the three fields below it are all false/null unless
+  // there's an actual accepted WayRequest between viewer and owner (never
+  // set for access via a ProfileAccessRequest alone, or when viewing your
+  // own profile) — isConnected is the one to gate UI on, since an older
+  // connection may still have a null discoveredVia. phoneNumber is the
+  // owner's number, present only when the owner has shared it with this
+  // specific viewer; sharingMyPhone is the viewer's OWN current choice for
+  // this connection (what the "Share my phone number with them" toggle on
+  // this page reflects/sets — see api/profiles.ts's shareMyPhoneWith).
+  isConnected: boolean;
+  discoveredVia: DiscoveredVia | null;
+  phoneNumber: string | null;
+  sharingMyPhone: boolean;
 }
 
 // A unified-search result additionally carries its profile kind, to group
@@ -313,13 +337,17 @@ export interface WayRequest {
   text: string | null;
   mediaUrl: string | null;
   mediaType: "image" | "video" | null;
-  // Which search mode the sender found the recipient through — drives
-  // Profile.autoGrantAccessVia* once this request is accepted; null for a
-  // sender that didn't come from search (e.g. scanning a QR code).
-  discoveredVia: SearchMode | null;
+  // How the sender found the recipient — drives Profile.autoGrantAccessVia*
+  // once this request is accepted; null if the client didn't record one.
+  discoveredVia: DiscoveredVia | null;
   status: WayRequestStatus;
   createdAt: string;
   respondedAt: string | null;
+  // Per-connection phone sharing — each side's own choice to share THEIR
+  // number with the other; never a blanket setting. See the backend
+  // schema's own doc comment on these two fields.
+  fromSharesPhone: boolean;
+  toSharesPhone: boolean;
 }
 
 export type ProfileAccessRequestStatus = "pending" | "accepted" | "declined";

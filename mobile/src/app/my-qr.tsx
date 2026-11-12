@@ -31,7 +31,7 @@ export default function MyQrScreen() {
         <QRCode value={activeProfile.wayId} size={QR_SIZE} color={colors.textPrimary} backgroundColor={colors.surface} />
       </View>
 
-      <Text style={styles.wayId}>WAY/{activeProfile.wayId}</Text>
+      <Text style={styles.wayId}>{activeProfile.wayId}</Text>
     </View>
   );
 }

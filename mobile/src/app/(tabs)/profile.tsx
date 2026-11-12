@@ -176,7 +176,7 @@ export default function ProfileScreen() {
               {activeProfile.isVerified ? " ✓" : ""}
             </Text>
             <Pressable style={styles.wayRow} onPress={() => router.push("/my-qr")} hitSlop={8}>
-              <Text style={styles.way}>WAY/{activeProfile.wayId}</Text>
+              <Text style={styles.way}>{activeProfile.wayId}</Text>
               <Ionicons name="qr-code-outline" size={16} color={colors.textSecondary} />
             </Pressable>
             {activeProfile.bio && <Text style={styles.bio}>{activeProfile.bio}</Text>}
@@ -223,7 +223,7 @@ export default function ProfileScreen() {
                       />
                     )}
                     <Text style={[styles.switcherLabel, p.id === activeProfile.id && styles.switcherLabelActive]}>
-                      WAY/{p.wayId}
+                      {p.wayId}
                     </Text>
                   </Pressable>
                 ))}

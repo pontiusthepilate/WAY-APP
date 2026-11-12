@@ -13,7 +13,7 @@ const LABEL_BY_TYPE: Record<Transaction["type"], string> = {
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
   const isCredit = tx.type === "fund" || tx.type === "transfer_in";
-  const counterpartyLabel = tx.counterparty ? `WAY/${tx.counterparty.wayId}` : tx.method === "card" ? "Card" : null;
+  const counterpartyLabel = tx.counterparty ? tx.counterparty.wayId : tx.method === "card" ? "Card" : null;
 
   return (
     <View style={styles.row}>

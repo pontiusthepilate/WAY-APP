@@ -66,7 +66,7 @@ export default function ProfileAccessRequestReviewScreen() {
       <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Profile Access Request</Text>
       <Text style={styles.subtitle}>
-        {request.fromProfile?.displayName ?? "Someone"} (WAY/{request.fromProfile?.wayId}) wants full access to your
+        {request.fromProfile?.displayName ?? "Someone"} ({request.fromProfile?.wayId}) wants full access to your
         profile
       </Text>
       <Text style={styles.time}>{formatRelativeTime(request.createdAt)}</Text>

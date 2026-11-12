@@ -98,7 +98,6 @@ export default function WalletSendScreen() {
       <Text style={styles.label}>Send to (WAY)</Text>
       <View style={styles.wayInputWrap}>
         <Ionicons name="at-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-        <Text style={styles.wayPrefix}>WAY/</Text>
         <TextInput
           style={styles.wayInput}
           placeholder="theirname"
@@ -179,7 +178,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   inputIcon: { marginRight: spacing.xs },
-  wayPrefix: { ...typography.body, color: colors.primaryDark, fontWeight: "700" },
   wayInput: { flex: 1, paddingVertical: spacing.sm, ...typography.body, color: colors.textPrimary },
   inputWrap: {
     flexDirection: "row",

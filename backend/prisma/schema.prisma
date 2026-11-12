@@ -102,6 +102,14 @@ model Profile {
   visibilityText     String?
   visibilityImageUrl String?
 
+  // Can someone who has this account's phone number find this profile at
+  // all (the WAY-ID/phone search already existed unconditionally before
+  // this — this adds the missing opt-out). Defaults true to preserve that
+  // existing behavior. This is the only phone-privacy setting that's
+  // general/blanket — whether a found profile's actual number gets shown
+  // back is never general, see WayRequest's fromSharesPhone/toSharesPhone.
+  discoverableByPhone Boolean @default(true)
+
   // Short, optional "what you do/offer/are into" teaser shown alongside the
   // mini-profile card and used as search-matchable free text (see
   // lib/describeMatch.ts) — separate from visibilityText, which is a
@@ -284,12 +292,27 @@ model WayRequest {
   createdAt     DateTime  @default(now())
   respondedAt   DateTime?
 
-  // The search mode the sender found the recipient through (set by the
-  // mobile client at send time) — "nearby" | "address" | "location" |
-  // "wayid" | "all", or null for a sender that didn't come from search
-  // (e.g. scanning a QR code). Drives Profile.autoGrantAccessVia* once this
-  // request is accepted; see lib/profileAccess.ts.
+  // How the sender found the recipient (set by the mobile client at send
+  // time) — "nearby" | "address" | "location" | "wayid" | "all" | "qr", or
+  // null if the client didn't record one. Drives Profile.autoGrantAccessVia*
+  // once this request is accepted (see lib/profileAccess.ts) and is shown
+  // back to the viewer on the full-profile page once connected (see
+  // getConnectionDiscoveredVia there) — "qr" never matches any
+  // autoGrantAccessVia* rule, all of which are search-specific.
   discoveredVia String?
+
+  // Phone-number sharing is per-connection, never general — each side
+  // independently controls whether THEY share THEIR OWN number with the
+  // other person on this specific connection, never a blanket "share with
+  // anyone who finds me" switch. fromSharesPhone is fromProfile's choice
+  // (whether fromProfile's number is shown to toProfile); toSharesPhone is
+  // toProfile's choice, the opposite direction. Both default false. The
+  // recipient (toProfile — the only side that can ever accept) is offered
+  // toSharesPhone inline at accept time (see POST .../accept) but either
+  // side can change their own flag anytime after from the other person's
+  // profile page — see PATCH /profiles/:id/share-phone.
+  fromSharesPhone Boolean @default(false)
+  toSharesPhone   Boolean @default(false)
 
   @@index([fromProfileId])
   @@index([toProfileId, status])

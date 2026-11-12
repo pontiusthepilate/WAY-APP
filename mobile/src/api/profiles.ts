@@ -15,6 +15,7 @@ export function createProfile(input: {
   categories?: string[];
   kind?: "personal" | "business" | "podcast";
   bio?: string;
+  discoverableByPhone?: boolean;
 }) {
   return api.post<Profile>("/profiles", input);
 }
@@ -39,6 +40,13 @@ export function suggestWhichWay(bio: string) {
 // subset depending on the viewer's computed access level.
 export function getProfileView(id: string, viewerProfileId: string) {
   return api.get<ProfileViewResult>(`/profiles/${id}?viewerProfileId=${encodeURIComponent(viewerProfileId)}`);
+}
+
+// The viewer's own per-connection choice: share MY phone number with the
+// profile at `id`. Only succeeds when there's an actual accepted WayRequest
+// between the two (see backend's PATCH /profiles/:id/share-phone).
+export function shareMyPhoneWith(id: string, viewerProfileId: string, share: boolean) {
+  return api.patch<{ share: boolean }>(`/profiles/${id}/share-phone`, { viewerProfileId, share });
 }
 
 export function updateAccessGrants(
@@ -67,7 +75,13 @@ export function updateVisibility(
   input: Partial<
     Pick<
       Profile,
-      "isVisible" | "visibleToNearby" | "visibleToAddress" | "visibleToLocation" | "visibilityText" | "visibilityImageUrl"
+      | "isVisible"
+      | "visibleToNearby"
+      | "visibleToAddress"
+      | "visibleToLocation"
+      | "visibilityText"
+      | "visibilityImageUrl"
+      | "discoverableByPhone"
     >
   >
 ) {

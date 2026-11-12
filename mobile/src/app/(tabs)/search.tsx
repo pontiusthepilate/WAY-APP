@@ -20,7 +20,7 @@ import { RadarView } from "../../components/RadarView";
 import { ConnectionRow } from "../../components/ConnectionRow";
 import { ConnectionGridItem } from "../../components/ConnectionGridItem";
 import { ViewToggle } from "../../components/ViewToggle";
-import { SearchModeTabs } from "../../components/SearchModeTabs";
+import { FIND_MODES, SearchModeTabs } from "../../components/SearchModeTabs";
 import { RadiusPicker } from "../../components/RadiusPicker";
 import { MiniProfileModal } from "../../components/MiniProfileModal";
 import { EventSearchPanel } from "../../components/EventSearchPanel";
@@ -65,6 +65,11 @@ export default function SearchScreen() {
   const [view, setView] = useState<ResultView>("radar");
   const [radiusMeters, setRadiusMeters] = useState(500);
   const [category, setCategory] = useState("");
+  // Address/Location/WAY ID are one merged field in the UI (`findText`) —
+  // these three still hold whichever one actually got resolved, since
+  // runSearch's own per-mode branches below are unchanged and still read
+  // from them directly (same for `discoveredVia`, which still needs the
+  // real resolved mode, not just "find").
   const [addressText, setAddressText] = useState("");
   const [locationText, setLocationText] = useState("");
   const [wayIdText, setWayIdText] = useState("");
@@ -81,18 +86,12 @@ export default function SearchScreen() {
   // this point directly or fall back to a fresh free-text geocode.
   const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [addressSuggestions, setAddressSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [locationSuggestions, setLocationSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
-  const [locationSuggestLoading, setLocationSuggestLoading] = useState(false);
-  const addressSessionRef = useRef(newSessionToken());
-  const locationSessionRef = useRef(newSessionToken());
-  const debouncedAddressText = useDebouncedValue(addressText, 300);
-  const debouncedLocationText = useDebouncedValue(locationText, 300);
-  // Which field a drop-a-pin session is filling in — null means the picker
-  // is closed. Doubles as the open flag so there's one source of truth for
-  // which TextInput the resolved pin should land in.
-  const [mapPickerMode, setMapPickerMode] = useState<"address" | "location" | null>(null);
+  const [findText, setFindText] = useState("");
+  const [findSuggestions, setFindSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [findSuggestLoading, setFindSuggestLoading] = useState(false);
+  const findSessionRef = useRef(newSessionToken());
+  const debouncedFindText = useDebouncedValue(findText, 300);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
 
   const [results, setResults] = useState<NearbyResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,46 +133,27 @@ export default function SearchScreen() {
   }, [mode]);
 
   useEffect(() => {
-    const text = debouncedAddressText.trim();
-    if (text.length < 3) {
+    const text = debouncedFindText.trim();
+    // A phone-like query isn't a place — skip the (wasted) Mapbox call and
+    // just clear any suggestions left over from typing something else first.
+    if (text.length < 3 || looksLikePhone(text)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAddressSuggestions([]);
+      setFindSuggestions([]);
       return;
     }
     let cancelled = false;
-    setAddressSuggestLoading(true);
-    suggestPlaces(text, { sessionToken: addressSessionRef.current, language })
+    setFindSuggestLoading(true);
+    suggestPlaces(text, { sessionToken: findSessionRef.current, language })
       .then((results) => {
-        if (!cancelled) setAddressSuggestions(results);
+        if (!cancelled) setFindSuggestions(results);
       })
       .finally(() => {
-        if (!cancelled) setAddressSuggestLoading(false);
+        if (!cancelled) setFindSuggestLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [debouncedAddressText, language]);
-
-  useEffect(() => {
-    const text = debouncedLocationText.trim();
-    if (text.length < 3) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLocationSuggestions([]);
-      return;
-    }
-    let cancelled = false;
-    setLocationSuggestLoading(true);
-    suggestPlaces(text, { sessionToken: locationSessionRef.current, language })
-      .then((results) => {
-        if (!cancelled) setLocationSuggestions(results);
-      })
-      .finally(() => {
-        if (!cancelled) setLocationSuggestLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedLocationText, language]);
+  }, [debouncedFindText, language]);
 
   // Accepts an optional category override so a fresh pick from the
   // category sheet (direct, sentence-matched, or "Clear") can run the
@@ -320,6 +300,7 @@ export default function SearchScreen() {
           setError("Enter a street address to search.");
           return;
         }
+        setFindText(parsed.locationQuery);
         setAddressText(parsed.locationQuery);
         setAddressCoords(null);
         next = await searchAddress({ profileId: activeProfile.id, address: parsed.locationQuery, radiusMeters: radius, describe: parsed.describe ?? undefined, language });
@@ -328,11 +309,13 @@ export default function SearchScreen() {
           setError("Enter a place, city, state, or country to search.");
           return;
         }
+        setFindText(parsed.locationQuery);
         setLocationText(parsed.locationQuery);
         setLocationCoords(null);
         next = await searchLocation({ profileId: activeProfile.id, query: parsed.locationQuery, radiusMeters: radius, describe: parsed.describe ?? undefined, language });
       } else if (parsed.mode === "wayid") {
         const q = parsed.wayIdQuery ?? trimmed;
+        setFindText(q);
         setWayIdText(q);
         next = await searchByWayId({ profileId: activeProfile.id, query: q });
         if (next.length === 0) setError("No WAY found with that ID or phone number.");
@@ -357,6 +340,7 @@ export default function SearchScreen() {
   async function jumpToLocation(loc: { lat: number; lng: number; label: string }) {
     if (!activeProfile) return;
     setMode("location");
+    setFindText(loc.label);
     setLocationText(loc.label);
     setLoading(true);
     setError(null);
@@ -374,67 +358,99 @@ export default function SearchScreen() {
   // mirrors jumpToLocation's "we already have coordinates, don't re-geocode"
   // shape, rather than routing through runSearch (whose addressText/
   // locationCoords state wouldn't be updated yet by the time it'd run).
-  async function selectAddressSuggestion(s: PlaceSuggestion) {
+  // Address vs. location is decided from Mapbox's own feature_type on the
+  // suggestion — "address"/"street" is a precise street-level result,
+  // everything else (place/locality/region/country/poi/etc.) is a general
+  // location — so this doesn't need a second classification step.
+  async function selectFindSuggestion(s: PlaceSuggestion) {
     if (!activeProfile) return;
-    const resolved = await retrievePlace(s.mapboxId, { sessionToken: addressSessionRef.current, language });
-    addressSessionRef.current = newSessionToken();
-    setAddressSuggestions([]);
+    const resolved = await retrievePlace(s.mapboxId, { sessionToken: findSessionRef.current, language });
+    findSessionRef.current = newSessionToken();
+    setFindSuggestions([]);
     if (!resolved) return;
-    setAddressText(resolved.label);
-    setAddressCoords({ lat: resolved.lat, lng: resolved.lng });
+    const resolvedMode: "address" | "location" = s.featureType === "address" || s.featureType === "street" ? "address" : "location";
+    setMode(resolvedMode);
+    setFindText(resolved.label);
     setLoading(true);
     setError(null);
     try {
-      const next = await searchAddress({ profileId: activeProfile.id, lat: resolved.lat, lng: resolved.lng, radiusMeters, category: category || undefined, language });
-      setResults(next);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function selectLocationSuggestion(s: PlaceSuggestion) {
-    if (!activeProfile) return;
-    const resolved = await retrievePlace(s.mapboxId, { sessionToken: locationSessionRef.current, language });
-    locationSessionRef.current = newSessionToken();
-    setLocationSuggestions([]);
-    if (!resolved) return;
-    setLocationText(resolved.label);
-    setLocationCoords({ lat: resolved.lat, lng: resolved.lng });
-    setLoading(true);
-    setError(null);
-    try {
-      const next = await searchLocation({ profileId: activeProfile.id, lat: resolved.lat, lng: resolved.lng, radiusMeters, category: category || undefined, language });
-      setResults(next);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Confirms a dropped pin from MapPickerModal into whichever field opened
-  // it — same "we already have a resolved point, search on it directly"
-  // shape as selectAddressSuggestion/selectLocationSuggestion above.
-  async function pickOnMap(point: { lat: number; lng: number; label: string }) {
-    const target = mapPickerMode;
-    setMapPickerMode(null);
-    if (!activeProfile || !target) return;
-    setLoading(true);
-    setError(null);
-    try {
-      if (target === "address") {
-        setAddressText(point.label);
-        setAddressCoords({ lat: point.lat, lng: point.lng });
-        const next = await searchAddress({ profileId: activeProfile.id, lat: point.lat, lng: point.lng, radiusMeters, category: category || undefined, language });
-        setResults(next);
+      let next: NearbyResult[];
+      if (resolvedMode === "address") {
+        setAddressText(resolved.label);
+        setAddressCoords({ lat: resolved.lat, lng: resolved.lng });
+        next = await searchAddress({ profileId: activeProfile.id, lat: resolved.lat, lng: resolved.lng, radiusMeters, category: category || undefined, language });
       } else {
-        setLocationText(point.label);
-        setLocationCoords({ lat: point.lat, lng: point.lng });
-        const next = await searchLocation({ profileId: activeProfile.id, lat: point.lat, lng: point.lng, radiusMeters, category: category || undefined, language });
-        setResults(next);
+        setLocationText(resolved.label);
+        setLocationCoords({ lat: resolved.lat, lng: resolved.lng });
+        next = await searchLocation({ profileId: activeProfile.id, lat: resolved.lat, lng: resolved.lng, radiusMeters, category: category || undefined, language });
       }
+      setResults(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Submits the merged field's free text (no suggestion tapped) — a bare
+  // WAY ID/phone number, or address/location text typed without picking an
+  // autocomplete result. Reuses the same backend classifier the AI search
+  // bar already calls (lib/searchIntent.ts); a "nearby"/"all" guess from it
+  // doesn't apply to this field at all, so that falls back to "location" —
+  // the single most forgiving guess, same reasoning parseSearchQuery's own
+  // backend fallback already uses.
+  async function handleFindSearch() {
+    const trimmed = findText.trim();
+    if (!trimmed || !activeProfile) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const parsed = await parseSearchQuery(trimmed);
+      const resolvedMode: "address" | "location" | "wayid" =
+        parsed.mode === "address" || parsed.mode === "location" || parsed.mode === "wayid" ? parsed.mode : "location";
+      setMode(resolvedMode);
+      let next: NearbyResult[];
+      if (resolvedMode === "wayid") {
+        const q = parsed.wayIdQuery ?? trimmed;
+        setWayIdText(q);
+        const query = looksLikePhone(q) && !q.startsWith("+") ? `+${wayIdCountry.dialCode}${q.replace(/\D/g, "")}` : q;
+        next = await searchByWayId({ profileId: activeProfile.id, query });
+        if (next.length === 0) setError("No WAY found with that ID or phone number.");
+      } else if (resolvedMode === "address") {
+        const q = parsed.locationQuery ?? trimmed;
+        setAddressText(q);
+        setAddressCoords(null);
+        next = await searchAddress({ profileId: activeProfile.id, address: q, radiusMeters, category: category || undefined, language });
+      } else {
+        const q = parsed.locationQuery ?? trimmed;
+        setLocationText(q);
+        setLocationCoords(null);
+        next = await searchLocation({ profileId: activeProfile.id, query: q, radiusMeters, category: category || undefined, language });
+      }
+      setResults(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Confirms a dropped pin from MapPickerModal — a manually-placed pin reads
+  // as "a general spot," not a verified street address, so it's always
+  // classified as "location" (same "we already have a resolved point,
+  // search on it directly" shape as selectFindSuggestion above).
+  async function pickOnMap(point: { lat: number; lng: number; label: string }) {
+    setMapPickerOpen(false);
+    if (!activeProfile) return;
+    setMode("location");
+    setFindText(point.label);
+    setLocationText(point.label);
+    setLocationCoords({ lat: point.lat, lng: point.lng });
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await searchLocation({ profileId: activeProfile.id, lat: point.lat, lng: point.lng, radiusMeters, category: category || undefined, language });
+      setResults(next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Search failed. Try again.");
     } finally {
@@ -485,7 +501,7 @@ export default function SearchScreen() {
       <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
         <View>
           <Text style={styles.headerTitle}>WAY</Text>
-          <Text style={styles.headerSubtitle}>{activeProfile ? `WAY/${activeProfile.wayId}` : ""}</Text>
+          <Text style={styles.headerSubtitle}>{activeProfile ? activeProfile.wayId : ""}</Text>
         </View>
         <View style={styles.visibilityRow}>
           <Text style={styles.visibilityLabel}>{activeProfile?.isVisible ? "Visible" : "Hidden"}</Text>
@@ -539,55 +555,54 @@ export default function SearchScreen() {
 
         <SearchModeTabs value={mode} onChange={setMode} />
 
-        {mode === "address" && (
+        {FIND_MODES.includes(mode) && (
           <>
-            <View style={styles.inputWrap}>
-              <Ionicons name="location-outline" size={18} color={colors.textSecondary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Street address, anywhere on earth"
-                placeholderTextColor={colors.textSecondary}
-                value={addressText}
-                onChangeText={(text) => {
-                  setAddressText(text);
-                  setAddressCoords(null);
-                }}
-                onSubmitEditing={() => runSearch()}
-              />
-              <Pressable onPress={() => setMapPickerMode("address")} hitSlop={8} accessibilityLabel="Pick on map">
-                <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
+            <View style={styles.searchRow}>
+              <View style={[styles.inputWrap, styles.findInputWrap]}>
+                {looksLikePhone(findText) ? (
+                  <>
+                    <CountryCodeTrigger value={wayIdCountry} onPress={() => setCountryPickerOpen(true)} />
+                    <CountryCodeDivider />
+                  </>
+                ) : (
+                  <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
+                )}
+                <TextInput
+                  style={styles.input}
+                  placeholder="Address, place, or WAY ID / phone"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="none"
+                  value={findText}
+                  onChangeText={(text) => {
+                    setFindText(text);
+                    setAddressCoords(null);
+                    setLocationCoords(null);
+                  }}
+                  onSubmitEditing={handleFindSearch}
+                />
+                {loading ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Pressable onPress={handleFindSearch} hitSlop={8} accessibilityLabel="Search">
+                    <Ionicons name="arrow-forward-circle" size={22} color={colors.primary} />
+                  </Pressable>
+                )}
+                <Pressable onPress={() => setMapPickerOpen(true)} hitSlop={8} accessibilityLabel="Pick on map">
+                  <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+              <Pressable style={styles.scanButton} onPress={() => router.push("/scan")} hitSlop={8}>
+                <Ionicons name="qr-code-outline" size={22} color={colors.primaryDark} />
               </Pressable>
             </View>
-            <PlaceSuggestions
-              suggestions={addressSuggestions}
-              loading={addressSuggestLoading}
-              onSelect={selectAddressSuggestion}
-            />
-          </>
-        )}
-        {mode === "location" && (
-          <>
-            <View style={styles.inputWrap}>
-              <Ionicons name="earth-outline" size={18} color={colors.textSecondary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Place, city, state, county, or country"
-                placeholderTextColor={colors.textSecondary}
-                value={locationText}
-                onChangeText={(text) => {
-                  setLocationText(text);
-                  setLocationCoords(null);
-                }}
-                onSubmitEditing={() => runSearch()}
-              />
-              <Pressable onPress={() => setMapPickerMode("location")} hitSlop={8} accessibilityLabel="Pick on map">
-                <Ionicons name="map-outline" size={20} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-            <PlaceSuggestions
-              suggestions={locationSuggestions}
-              loading={locationSuggestLoading}
-              onSelect={selectLocationSuggestion}
+            <PlaceSuggestions suggestions={findSuggestions} loading={findSuggestLoading} onSelect={selectFindSuggestion} />
+            <CountryPickerSheet
+              open={countryPickerOpen}
+              onClose={() => setCountryPickerOpen(false)}
+              onSelect={(c) => {
+                setWayIdCountry(c);
+                setCountryPickerOpen(false);
+              }}
             />
           </>
         )}
@@ -604,38 +619,6 @@ export default function SearchScreen() {
             />
           </View>
         )}
-        {mode === "wayid" && (
-          <>
-            <View style={styles.inputWrap}>
-              {looksLikePhone(wayIdText) ? (
-                <>
-                  <CountryCodeTrigger value={wayIdCountry} onPress={() => setCountryPickerOpen(true)} />
-                  <CountryCodeDivider />
-                </>
-              ) : (
-                <Ionicons name="at-outline" size={18} color={colors.textSecondary} />
-              )}
-              <TextInput
-                style={styles.input}
-                placeholder="WAY ID (username) or phone number"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-                value={wayIdText}
-                onChangeText={setWayIdText}
-                onSubmitEditing={() => runSearch()}
-              />
-            </View>
-            <CountryPickerSheet
-              open={countryPickerOpen}
-              onClose={() => setCountryPickerOpen(false)}
-              onSelect={(c) => {
-                setWayIdCountry(c);
-                setCountryPickerOpen(false);
-              }}
-            />
-          </>
-        )}
-
         {mode !== "wayid" && mode !== "all" && (
           <>
             <View style={styles.inputWrap}>
@@ -660,7 +643,7 @@ export default function SearchScreen() {
 
         {mode !== "wayid" && mode !== "all" && <RadiusPicker value={radiusMeters} onChange={setRadiusMeters} />}
 
-        {mode !== "nearby" && (
+        {mode === "all" && (
           <View style={styles.searchRow}>
             <DotOutline radius={radii.pill} tone="onDark" style={styles.searchButtonWrap}>
               <Pressable style={styles.searchButton} onPress={() => runSearch()}>
@@ -668,11 +651,6 @@ export default function SearchScreen() {
                 <Ionicons name="search-outline" size={18} color={colors.textOnPrimary} />
               </Pressable>
             </DotOutline>
-            {mode === "wayid" && (
-              <Pressable style={styles.scanButton} onPress={() => router.push("/scan")} hitSlop={8}>
-                <Ionicons name="qr-code-outline" size={22} color={colors.primaryDark} />
-              </Pressable>
-            )}
           </View>
         )}
 
@@ -774,10 +752,10 @@ export default function SearchScreen() {
       />
 
       <MapPickerModal
-        open={mapPickerMode !== null}
+        open={mapPickerOpen}
         initialCenter={coords}
         language={language}
-        onClose={() => setMapPickerMode(null)}
+        onClose={() => setMapPickerOpen(false)}
         onConfirm={pickOnMap}
       />
     </View>
@@ -834,6 +812,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
   },
+  // The merged Address/Location/WAY ID field sits next to the scan button
+  // in its own row, so (unlike every other inputWrap here, which is the
+  // sole thing in its row) it needs to be told to take the remaining space.
+  findInputWrap: { flex: 1 },
   input: {
     flex: 1,
     paddingVertical: spacing.sm,

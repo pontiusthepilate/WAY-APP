@@ -86,7 +86,7 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
 
   function handleReshare() {
     Alert.alert("Share to another profile", "Post this to one of your other profiles", [
-      ...resharesSiblings.map((p) => ({ text: `WAY/${p.wayId}`, onPress: () => doReshare(p.id) })),
+      ...resharesSiblings.map((p) => ({ text: p.wayId, onPress: () => doReshare(p.id) })),
       { text: "Cancel", style: "cancel" as const },
     ]);
   }
@@ -103,7 +103,7 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
   return (
     <View style={styles.card}>
       {post.type === "repost" && post.sharedFromPost && (
-        <Text style={styles.repostBanner}>🔁 WAY/{post.profile.wayId} shared this</Text>
+        <Text style={styles.repostBanner}>🔁 {post.profile.wayId} shared this</Text>
       )}
       <View style={styles.header}>
         <Avatar
@@ -127,7 +127,7 @@ export function PostCard({ post, onChange, onOpenComments, hasActiveStatus }: Pr
             {content.profile.isVerified ? " ✓" : ""}
           </Text>
           <Text style={styles.way} numberOfLines={1}>
-            WAY/{content.profile.wayId} · {formatRelativeTime(post.createdAt)}
+            {content.profile.wayId} · {formatRelativeTime(post.createdAt)}
           </Text>
         </View>
       </View>

@@ -61,7 +61,7 @@ export default function PodcastsScreen() {
                   {item.title}
                 </Text>
                 <Text style={styles.episodeMeta}>
-                  WAY/{item.profile.wayId} · {formatRelativeTime(item.createdAt)}
+                  {item.profile.wayId} · {formatRelativeTime(item.createdAt)}
                 </Text>
               </View>
               <Ionicons name={item.type === "audio" ? "play-circle-outline" : "videocam-outline"} size={26} color={colors.primary} />

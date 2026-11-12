@@ -57,7 +57,7 @@ export default function ProfileAccessRequestScreen() {
       <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Request Full Profile Access</Text>
       <Text style={styles.subtitle}>
-        to {toDisplayName} (WAY/{toWayId})
+        to {toDisplayName} ({toWayId})
       </Text>
 
       <View style={styles.textAreaWrap}>

@@ -117,7 +117,7 @@ export function EventSearchPanel() {
                 </Text>
               )}
               <Text style={styles.cardBy} numberOfLines={1}>
-                by WAY/{item.profile.wayId}
+                by {item.profile.wayId}
               </Text>
             </View>
           </Pressable>

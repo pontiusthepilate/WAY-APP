@@ -61,7 +61,7 @@ export default function BlockedAccountsScreen() {
             <Avatar uri={item.targetProfile?.displayPictureUrl ?? null} displayName={item.targetProfile?.displayName ?? "?"} size={44} />
             <View style={styles.rowBody}>
               <Text style={styles.name}>{item.targetProfile?.displayName ?? "Unknown"}</Text>
-              {item.targetProfile?.wayId && <Text style={styles.wayId}>WAY/{item.targetProfile.wayId}</Text>}
+              {item.targetProfile?.wayId && <Text style={styles.wayId}>{item.targetProfile.wayId}</Text>}
             </View>
             <Pressable
               style={styles.unblockButton}

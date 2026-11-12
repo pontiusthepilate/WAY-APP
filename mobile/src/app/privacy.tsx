@@ -6,7 +6,7 @@ import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { safeBack } from "../lib/navigation";
 import { PageBackground } from "../components/PageBackground";
-import { updatePrivacy, updateAccessGrants } from "../api/profiles";
+import { updatePrivacy, updateAccessGrants, updateVisibility } from "../api/profiles";
 import type { Profile } from "../types";
 
 type MessagePrivacy = Profile["messagePrivacy"];
@@ -65,6 +65,11 @@ export default function PrivacyScreen() {
     await refreshProfiles();
   }
 
+  async function toggleDiscoverableByPhone(next: boolean) {
+    await updateVisibility(activeProfile!.id, { discoverableByPhone: next });
+    await refreshProfiles();
+  }
+
   return (
     <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
       <PageBackground />
@@ -91,6 +96,16 @@ export default function PrivacyScreen() {
         );
       })}
       {saving && <Text style={styles.savingHint}>Saving…</Text>}
+
+      <Text style={[styles.sectionLabel, styles.secondSectionLabel]}>Phone number privacy</Text>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Let people who have your number find your WAY</Text>
+        <Switch value={activeProfile.discoverableByPhone} onValueChange={toggleDiscoverableByPhone} />
+      </View>
+      <Text style={styles.sectionHint}>
+        Your actual number is never shown here — only to someone you&apos;ve connected with, and only if you choose
+        to share it with them specifically, from their own profile page.
+      </Text>
 
       <Text style={[styles.sectionLabel, styles.secondSectionLabel]}>
         Who gets full profile access when they connect
@@ -164,5 +179,5 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.xs,
   },
-  rowLabel: { ...typography.body, color: colors.textPrimary },
+  rowLabel: { ...typography.body, color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
 });

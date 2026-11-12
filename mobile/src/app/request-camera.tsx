@@ -55,7 +55,7 @@ export default function RequestCameraScreen() {
       <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Request Camera Access</Text>
       <Text style={styles.subtitle}>
-        to {toDisplayName} (WAY/{toWayId})
+        to {toDisplayName} ({toWayId})
       </Text>
 
       <Text style={styles.notice}>

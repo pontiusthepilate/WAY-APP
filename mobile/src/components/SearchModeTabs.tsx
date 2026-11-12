@@ -3,21 +3,34 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import type { SearchMode } from "../types";
 
-const OPTIONS: { key: SearchMode; label: string }[] = [
+// "Find" is one tab over three underlying modes — address, location, and
+// WAY ID/phone are no longer separate tabs with separate fields; typing (or
+// tapping a suggestion) into the one merged field decides which of the
+// three actually runs, see search.tsx's handleFindSearch/selectFindSuggestion.
+export const FIND_MODES: SearchMode[] = ["address", "location", "wayid"];
+
+const OPTIONS: { key: "all" | "nearby" | "find"; label: string }[] = [
   { key: "all", label: "Search" },
   { key: "nearby", label: "Nearby" },
-  { key: "address", label: "Address" },
-  { key: "location", label: "Location" },
-  { key: "wayid", label: "WAY ID" },
+  { key: "find", label: "Find" },
 ];
 
 export function SearchModeTabs({ value, onChange }: { value: SearchMode; onChange: (v: SearchMode) => void }) {
+  const activeKey = FIND_MODES.includes(value) ? "find" : value;
   return (
     <View style={styles.row}>
       {OPTIONS.map((opt) => {
-        const active = opt.key === value;
+        const active = opt.key === activeKey;
         return (
-          <Pressable key={opt.key} style={[styles.tab, active && styles.tabActive]} onPress={() => onChange(opt.key)}>
+          <Pressable
+            key={opt.key}
+            style={[styles.tab, active && styles.tabActive]}
+            // Re-picking "Find" keeps whichever of the 3 underlying modes was
+            // last resolved (so it doesn't forget a prior address/wayid
+            // search); landing on it fresh defaults to "location" — a
+            // neutral starting point, not a commitment to any one of the 3.
+            onPress={() => onChange(opt.key === "find" ? (FIND_MODES.includes(value) ? value : "location") : opt.key)}
+          >
             <Text style={[styles.label, active && styles.labelActive]}>{opt.label}</Text>
           </Pressable>
         );

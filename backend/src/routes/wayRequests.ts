@@ -15,9 +15,15 @@ const createRequestBody = z.object({
   mediaType: z.enum(["image", "video"]).optional(),
   // Which search mode the sender found the recipient through (feature:
   // profile access) — drives Profile.autoGrantAccessVia* once accepted.
-  discoveredVia: z.enum(["nearby", "address", "location", "wayid", "all"]).optional(),
+  discoveredVia: z.enum(["nearby", "address", "location", "wayid", "all", "qr"]).optional(),
 });
-const respondBody = z.object({ profileId: z.string() });
+// sharePhoneNumber is only meaningful on accept — the recipient (always
+// toProfile; only they can ever accept) choosing whether to share their own
+// number with the sender right away, rather than visiting their profile
+// later (see PATCH /profiles/:id/share-phone). Omitted entirely just skips
+// that choice for now, same as a decline (which ignores it; the zod shape
+// is shared for both bodies here, not a decline-specific behavior change).
+const respondBody = z.object({ profileId: z.string(), sharePhoneNumber: z.boolean().optional() });
 
 async function withSender<T extends { fromProfileId: string; toProfileId: string }>(row: T) {
   const [from, to] = await Promise.all([
@@ -129,7 +135,11 @@ export async function wayRequestRoutes(app: FastifyInstance) {
 
     const updated = await prisma.wayRequest.update({
       where: { id },
-      data: { status: "accepted", respondedAt: new Date() },
+      data: {
+        status: "accepted",
+        respondedAt: new Date(),
+        ...(body.sharePhoneNumber !== undefined ? { toSharesPhone: body.sharePhoneNumber } : {}),
+      },
     });
 
     // Accept/decline confirmations are intentionally ungated by

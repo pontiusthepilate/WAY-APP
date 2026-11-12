@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
 import { useSession } from "../context/SessionContext";
 import { sendWayRequest } from "../api/wayRequests";
-import type { SearchMode } from "../types";
+import type { DiscoveredVia } from "../types";
 import { uploadMedia } from "../api/uploads";
 import { ApiError } from "../api/client";
 import { safeBack } from "../lib/navigation";
@@ -20,7 +20,7 @@ export default function WayRequestScreen() {
   const { toWayId, toDisplayName, discoveredVia } = useLocalSearchParams<{
     toWayId: string;
     toDisplayName: string;
-    discoveredVia?: SearchMode;
+    discoveredVia?: DiscoveredVia;
   }>();
   const { activeProfile } = useSession();
   const insets = useSafeAreaInsets();
@@ -94,7 +94,7 @@ export default function WayRequestScreen() {
     <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
       <SkyOceanBackground tone="pale" />
       <Text style={styles.title}>Send a WAY Request</Text>
-      <Text style={styles.subtitle}>to {toDisplayName} (WAY/{toWayId})</Text>
+      <Text style={styles.subtitle}>to {toDisplayName} ({toWayId})</Text>
 
       <View style={styles.textAreaWrap}>
         <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} style={styles.textAreaIcon} />

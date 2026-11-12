@@ -123,7 +123,7 @@ export default function EpisodeScreen() {
             <Pressable style={styles.authorRow} onPress={() => router.push(`/profile`)} hitSlop={6}>
               <Avatar uri={episode.profile.displayPictureUrl} displayName={episode.profile.displayName} size={32} />
               <Text style={styles.authorName}>{episode.profile.displayName}</Text>
-              <Text style={styles.authorWay}>WAY/{episode.profile.wayId}</Text>
+              <Text style={styles.authorWay}>{episode.profile.wayId}</Text>
             </Pressable>
 
             {episode.type === "video" ? (

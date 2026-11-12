@@ -49,6 +49,26 @@ export async function computeProfileAccessLevel(viewerProfileId: string, owner: 
   return "restricted";
 }
 
+// Looks up the accepted WayRequest connecting these two profiles (either
+// direction), or null if they aren't connected via one (a ProfileAccessRequest-
+// only "full" access has no such row — this feature only applies when an
+// actual Connect exists). Two features key off this single row:
+// discoveredVia (shown back to the viewer on the full-profile page) and
+// fromSharesPhone/toSharesPhone (the per-connection phone-number reveal —
+// see routes/profiles.ts's GET/PATCH .../share-phone).
+export async function getConnection(profileAId: string, profileBId: string) {
+  return prisma.wayRequest.findFirst({
+    where: {
+      status: "accepted",
+      OR: [
+        { fromProfileId: profileAId, toProfileId: profileBId },
+        { fromProfileId: profileBId, toProfileId: profileAId },
+      ],
+    },
+    orderBy: { respondedAt: "desc" },
+  });
+}
+
 // The fixed field subset shown when accessLevel is "restricted" — the same
 // fields MiniProfileModal already shows to anyone, so the full-profile page
 // never reveals less than the mini-profile card does.

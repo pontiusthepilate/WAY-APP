@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { ConnectRecommendation, SearchMode, WayRequest } from "../types";
+import type { ConnectRecommendation, DiscoveredVia, WayRequest } from "../types";
 
 export function sendWayRequest(input: {
   fromProfileId: string;
@@ -7,7 +7,7 @@ export function sendWayRequest(input: {
   text?: string;
   mediaUrl?: string;
   mediaType?: "image" | "video";
-  discoveredVia?: SearchMode;
+  discoveredVia?: DiscoveredVia;
 }) {
   return api.post<WayRequest>("/way-requests", input);
 }
@@ -28,8 +28,8 @@ export function getConnectRecommendations(profileId: string) {
   return api.get<ConnectRecommendation[]>(`/way-requests/recommendations/${profileId}`);
 }
 
-export function acceptWayRequest(id: string, profileId: string) {
-  return api.post<WayRequest>(`/way-requests/${id}/accept`, { profileId });
+export function acceptWayRequest(id: string, profileId: string, sharePhoneNumber?: boolean) {
+  return api.post<WayRequest>(`/way-requests/${id}/accept`, { profileId, sharePhoneNumber });
 }
 
 export function declineWayRequest(id: string, profileId: string) {

@@ -294,7 +294,7 @@ export function MiniProfileModal({ result, onClose, onSendRequest, onRequestCame
                   {KIND_ICON[link.kind] && (
                     <Ionicons name={KIND_ICON[link.kind]} size={12} color={colors.primaryDark} style={styles.linkChipIcon} />
                   )}
-                  <Text style={styles.linkChipText}>WAY/{link.wayId}</Text>
+                  <Text style={styles.linkChipText}>{link.wayId}</Text>
                 </Pressable>
               ))}
             </View>

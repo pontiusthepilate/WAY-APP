@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,6 +54,12 @@ export default function CreateProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wayIdStatus, setWayIdStatus] = useState<WayIdStatus>("idle");
+  // Surfaced here rather than left to Privacy settings since this is new
+  // reachability a signup brings with it (people search is now possible).
+  // Whether a found/connected profile's actual number gets shown is never
+  // general — that's decided per-connection, at accept time or later on
+  // that person's own profile page (see way-request/[id].tsx, profile/[id].tsx).
+  const [discoverableByPhone, setDiscoverableByPhone] = useState(true);
   const [podcastPlan, setPodcastPlan] = useState<PodcastPlan | null>(null);
   const [podcastStatus, setPodcastStatus] = useState<PodcastStatus | null>(null);
   const [subscribing, setSubscribing] = useState(false);
@@ -134,7 +140,12 @@ export default function CreateProfileScreen() {
     setError(null);
     setLoading(true);
     try {
-      await createProfile({ wayId: wayId.trim(), displayName: displayName.trim(), kind });
+      await createProfile({
+        wayId: wayId.trim(),
+        displayName: displayName.trim(),
+        kind,
+        discoverableByPhone,
+      });
       await refreshProfiles();
       router.replace("/feed");
     } catch (err) {
@@ -157,7 +168,6 @@ export default function CreateProfileScreen() {
       <Text style={styles.label}>Your WAY</Text>
       <View style={styles.wayInputWrap}>
         <Ionicons name="at-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-        <Text style={styles.wayPrefix}>WAY/</Text>
         <TextInput
           style={styles.wayInput}
           placeholder="yourname"
@@ -177,6 +187,22 @@ export default function CreateProfileScreen() {
           {WAY_ID_STATUS_MESSAGE[wayIdStatus]}
         </Text>
       )}
+
+      <View style={styles.phonePrivacyBox}>
+        <Text style={styles.phonePrivacyTitle}>Phone number privacy</Text>
+        <View style={styles.phonePrivacyRow}>
+          <Text style={styles.phonePrivacyLabel}>Let people who have your number find your WAY</Text>
+          <Switch
+            value={discoverableByPhone}
+            onValueChange={setDiscoverableByPhone}
+            trackColor={{ true: colors.primary, false: colors.border }}
+          />
+        </View>
+        <Text style={styles.phonePrivacyHint}>
+          You can change this later in Privacy settings. Your actual number is only ever shown to someone you&apos;ve
+          connected with, and only if you choose to share it with them specifically.
+        </Text>
+      </View>
 
       <Text style={styles.label}>Display name</Text>
       <View style={styles.inputWrap}>
@@ -286,10 +312,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   inputIcon: { marginRight: spacing.xs },
-  wayPrefix: { ...typography.body, color: colors.primaryDark, fontWeight: "700" },
   wayInput: { flex: 1, paddingVertical: spacing.sm, ...typography.body, color: colors.textPrimary },
   wayIdHint: { ...typography.caption, color: colors.danger, marginTop: spacing.xs },
   wayIdHintAvailable: { color: colors.primary },
+  phonePrivacyBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  phonePrivacyTitle: { ...typography.caption, color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" },
+  phonePrivacyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  phonePrivacyLabel: { ...typography.body, color: colors.textPrimary, flex: 1 },
+  phonePrivacyHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",

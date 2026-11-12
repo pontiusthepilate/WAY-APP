@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./config";
+import { capitalizeDisplayNames } from "./client";
 import type { BusinessVerificationRequest, VerificationStatus } from "./businessVerification";
 import type { ProfileSummary } from "../types";
 
@@ -18,7 +19,8 @@ async function adminRequest<T>(path: string, secret: string, options: RequestIni
     },
   });
   const isJson = res.headers.get("content-type")?.includes("application/json");
-  const body = isJson ? await res.json() : undefined;
+  const rawBody = isJson ? await res.json() : undefined;
+  const body = isJson ? capitalizeDisplayNames(rawBody) : rawBody;
   if (!res.ok) throw new Error(body?.error ?? res.statusText);
   return body as T;
 }

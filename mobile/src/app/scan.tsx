@@ -48,7 +48,10 @@ export default function ScanScreen() {
   }
 
   function openRequest(result: NearbyResult) {
-    router.replace({ pathname: "/way-request", params: { toWayId: result.wayId, toDisplayName: result.displayName } });
+    router.replace({
+      pathname: "/way-request",
+      params: { toWayId: result.wayId, toDisplayName: result.displayName, discoveredVia: "qr" },
+    });
   }
 
   function openCameraRequest(result: NearbyResult) {
