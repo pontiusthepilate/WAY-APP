@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Polygon } from "react-native-svg";
 import { colors, spacing, typography } from "../theme/theme";
 import { OceanWavesBackground } from "./OceanWavesBackground";
@@ -57,33 +57,6 @@ function BoldChevron({ direction, color }: { direction: "up" | "down"; color: st
       <Circle cx={vertex.x} cy={vertex.y} r={CHEVRON_THICKNESS / 2} fill={color} />
     </Svg>
   );
-}
-
-// Deliberately not importing expo-router's BottomTabBarProps — its real
-// export path moves around between Expo SDKs and isn't worth chasing down
-// just for a type. This narrow shape is structurally compatible with
-// whatever the real props object is (TS checks shape, not origin), and it's
-// the only slice of it this component actually reads.
-interface TabBarRoute {
-  key: string;
-  name: string;
-}
-interface TabBarDescriptor {
-  options: {
-    title?: string;
-    tabBarIcon?: (props: { focused: boolean; color: string; size: number }) => React.ReactNode;
-    tabBarActiveTintColor?: ColorValue;
-    tabBarInactiveTintColor?: ColorValue;
-  };
-}
-export interface CollapsibleTabBarProps {
-  state: { index: number; routes: TabBarRoute[] };
-  descriptors: Record<string, TabBarDescriptor>;
-  navigation: {
-    navigate: (name: string) => void;
-    emit: (event: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
-  };
-  insets: { bottom: number };
 }
 
 // Each tab bobs and drifts on its own independent loop around its own flex
@@ -151,7 +124,20 @@ const SLIDE_DURATION_CLOSE = 540;
 // for every toggle after that.
 const INITIAL_PANEL_HEIGHT_GUESS = 180;
 
-export function CollapsibleTabBar({ state, descriptors, navigation, insets }: CollapsibleTabBarProps) {
+export interface PanelTab {
+  key: string;
+  label: string;
+  focused: boolean;
+  icon?: (props: { focused: boolean; color: string; size: number }) => React.ReactNode;
+  onPress: () => void;
+}
+
+// The floating arrow + slide-up panel itself, decoupled from React
+// Navigation — also used directly (not through CollapsibleTabBar) by
+// screens the Tabs navigator doesn't wrap, e.g. wallet-fund.tsx/go-live.tsx,
+// which are pushed as plain stack screens and so never get a tab bar of
+// their own. See lib/appTabs.ts for how those build their own `tabs` list.
+export function FloatingNavPanel({ tabs, insets }: { tabs: PanelTab[]; insets: { bottom: number } }) {
   const [expanded, setExpanded] = useState(false);
   // Whether the panel is in the tree at all — stays true for the duration
   // of the closing slide so it has something to animate, then flips false
@@ -184,26 +170,16 @@ export function CollapsibleTabBar({ state, descriptors, navigation, insets }: Co
     });
   }
 
-  const tabs = state.routes.map((route, index) => {
-    const { options } = descriptors[route.key];
-    const isFocused = state.index === index;
+  const tabNodes = tabs.map((tab, index) => {
     // Ignores the passed-in tint colors (tuned for a light background) —
     // the panel is now a "deep" ocean-wave video wash, so labels need the
     // light-on-dark treatment instead, same as onboarding's own text.
-    const color = isFocused ? colors.textOnPrimary : "rgba(255,255,255,0.68)";
-    const label = options.title ?? route.name;
-
-    function onPress() {
-      const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-      if (!isFocused && !event.defaultPrevented) {
-        navigation.navigate(route.name);
-      }
-    }
+    const color = tab.focused ? colors.textOnPrimary : "rgba(255,255,255,0.68)";
 
     return (
-      <FloatingTab key={route.key} onPress={onPress} seed={index}>
-        {options.tabBarIcon?.({ focused: isFocused, color: color as string, size: 24 })}
-        <Text style={[styles.label, { color }]}>{label}</Text>
+      <FloatingTab key={tab.key} onPress={tab.onPress} seed={index}>
+        {tab.icon?.({ focused: tab.focused, color, size: 24 })}
+        <Text style={[styles.label, { color }]}>{tab.label}</Text>
       </FloatingTab>
     );
   });
@@ -256,7 +232,7 @@ export function CollapsibleTabBar({ state, descriptors, navigation, insets }: Co
             <BoldChevron direction="down" color={colors.primary} />
           </Pressable>
           <View style={styles.row} pointerEvents="box-none">
-            {tabs}
+            {tabNodes}
           </View>
         </Animated.View>
       )}

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { TransactionRow } from "../../components/TransactionRow";
@@ -11,6 +12,7 @@ import { SkyOceanBackground } from "../../components/SkyOceanBackground";
 
 export default function WalletScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { activeProfile } = useSession();
   const [balances, setBalances] = useState<WalletBalance[]>([]);
   const [recent, setRecent] = useState<Transaction[]>([]);
@@ -44,7 +46,7 @@ export default function WalletScreen() {
       renderItem={({ item }) => <TransactionRow tx={item} />}
       ListHeaderComponent={
         <View>
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, { paddingTop: spacing.lg + insets.top }]}>
             <Image source={require("../../../assets/way-mark.png")} style={styles.headerLogo} resizeMode="contain" />
             <Text style={styles.headerTitle}>Wallet</Text>
           </View>
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   container: { flex: 1 },
   listPadding: { paddingBottom: 110 },
-  headerRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  headerRow: { paddingHorizontal: spacing.lg },
   headerLogo: { width: 52, height: 52, marginBottom: 2 },
   headerTitle: { ...typography.h1, color: colors.primaryDark },
   balanceRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm },

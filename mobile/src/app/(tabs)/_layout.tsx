@@ -2,12 +2,15 @@ import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/theme";
-import { CollapsibleTabBar } from "../../components/CollapsibleTabBar";
 
 export default function TabsLayout() {
   return (
     <Tabs
-      tabBar={(props) => <CollapsibleTabBar {...props} />}
+      // The floating arrow + slide-up menu is now a single global overlay
+      // (see components/GlobalNavPanel.tsx, mounted in app/_layout.tsx) that
+      // covers every screen, not just these — so this navigator renders no
+      // tab bar of its own.
+      tabBar={() => null}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primaryDark,

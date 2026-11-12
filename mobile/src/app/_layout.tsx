@@ -14,6 +14,7 @@ import { WaterRippleOverlay } from "../components/WaterRippleOverlay";
 import { CometTrail } from "../components/CometTrail";
 import { OrbitDot } from "../components/OrbitDot";
 import { EdgeGlow } from "../components/EdgeGlow";
+import { GlobalNavPanel } from "../components/GlobalNavPanel";
 import { colors } from "../theme/theme";
 import { MAPBOX_TOKEN } from "../api/config";
 
@@ -101,6 +102,9 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <OrbitDot />
       <CometTrail />
       <EdgeGlow />
+      {/* Only once there's a signed-in profile — before that (welcome, OTP,
+          onboarding, create-profile) there's no app section to jump to. */}
+      {activeProfile && <GlobalNavPanel />}
     </>
   );
 }
