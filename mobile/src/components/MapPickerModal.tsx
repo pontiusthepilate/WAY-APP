@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Mapbox from "@rnmapbox/maps";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../theme/theme";
@@ -29,6 +30,7 @@ interface Props {
 export function MapPickerModal({ open, initialCenter, language, onClose, onConfirm }: Props) {
   const [center, setCenter] = useState<[number, number]>(WORLD_CENTER);
   const [confirming, setConfirming] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Re-centers on the caller's starting point every time the sheet opens
   // (not just on first mount) — mirrors CountryPickerSheet resetting its own
@@ -52,14 +54,6 @@ export function MapPickerModal({ open, initialCenter, language, onClose, onConfi
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose}>
       <View style={styles.root}>
-        <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.headerButton} accessibilityLabel="Close map picker">
-            <Ionicons name="close" size={24} color={colors.textPrimary} />
-          </Pressable>
-          <Text style={styles.title}>Drop a pin</Text>
-          <View style={styles.headerButton} />
-        </View>
-
         <View style={styles.mapWrap}>
           <Mapbox.MapView
             style={StyleSheet.absoluteFill}
@@ -75,7 +69,28 @@ export function MapPickerModal({ open, initialCenter, language, onClose, onConfi
           </View>
         </View>
 
-        <View style={styles.footer}>
+        {/* The map is a native view (MapLibre/Mapbox GL Native), not a
+            plain RN-drawn one — on some devices its surface can take touch
+            priority over RN views that merely sit in a separate flex row
+            above it. Floating these controls as an explicitly-elevated
+            overlay (zIndex + Android's `elevation`) instead of a normal
+            layout sibling is the standard fix, so the close/confirm
+            buttons reliably receive taps regardless of that native
+            stacking quirk. */}
+        <Pressable
+          onPress={onClose}
+          hitSlop={12}
+          style={[styles.closeButton, { top: insets.top + spacing.sm }]}
+          accessibilityLabel="Close map picker"
+        >
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
+        </Pressable>
+
+        <View style={[styles.titlePill, { top: insets.top + spacing.sm }]} pointerEvents="none">
+          <Text style={styles.title}>Drop a pin</Text>
+        </View>
+
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}>
           <Pressable style={styles.confirmButton} onPress={handleConfirm} disabled={confirming}>
             {confirming ? (
               <ActivityIndicator color={colors.textOnPrimary} />
@@ -91,17 +106,6 @@ export function MapPickerModal({ open, initialCenter, language, onClose, onConfi
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
-  },
-  headerButton: { width: 32, alignItems: "center" },
-  title: { ...typography.h3, color: colors.textPrimary },
   mapWrap: { flex: 1 },
   // The pin's own bottom tip — not its bounding-box center — is the point
   // that should land exactly on the map's center, so the offset is a full
@@ -113,13 +117,59 @@ const styles = StyleSheet.create({
     marginLeft: -PIN_SIZE / 2,
     marginTop: -PIN_SIZE,
   },
-  footer: { padding: spacing.md, paddingBottom: spacing.lg },
+  closeButton: {
+    position: "absolute",
+    left: spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  titlePill: {
+    position: "absolute",
+    alignSelf: "center",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 15,
+    elevation: 15,
+  },
+  title: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    overflow: "hidden",
+  },
+  footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: spacing.md,
+    zIndex: 20,
+    elevation: 20,
+  },
   confirmButton: {
     backgroundColor: colors.primary,
     borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   confirmText: { ...typography.body, color: colors.textOnPrimary, fontWeight: "700" },
 });

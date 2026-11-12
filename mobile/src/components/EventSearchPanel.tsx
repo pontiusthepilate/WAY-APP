@@ -32,13 +32,18 @@ export function EventSearchPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const runSearch = useCallback(async () => {
+  // Accepts an optional category override so tapping a chip can run the
+  // search immediately instead of waiting for `category` state to
+  // re-render into this closure — same "feels instant" requirement as
+  // the profile search box's own category chips.
+  const runSearch = useCallback(async (categoryOverride?: string | null) => {
     setLoading(true);
     setError(null);
     try {
+      const cat = categoryOverride !== undefined ? categoryOverride : category;
       const page = await searchEvents({
         q: query.trim() || undefined,
-        category: category ?? undefined,
+        category: cat ?? undefined,
         profileId: activeProfile?.id,
       });
       setEvents(page.posts);
@@ -68,7 +73,7 @@ export function EventSearchPanel() {
           placeholderTextColor={colors.textSecondary}
           value={query}
           onChangeText={setQuery}
-          onSubmitEditing={runSearch}
+          onSubmitEditing={() => runSearch()}
         />
       </View>
 
@@ -78,7 +83,9 @@ export function EventSearchPanel() {
             key={c}
             style={[styles.categoryPill, category === c && styles.categoryPillActive]}
             onPress={() => {
-              setCategory((prev) => (prev === c ? null : c));
+              const next = category === c ? null : c;
+              setCategory(next);
+              runSearch(next);
             }}
           >
             <Text style={[styles.categoryLabel, category === c && styles.categoryLabelActive]}>{c}</Text>
@@ -86,7 +93,7 @@ export function EventSearchPanel() {
         ))}
       </View>
 
-      <Pressable style={styles.searchButton} onPress={runSearch} disabled={loading}>
+      <Pressable style={styles.searchButton} onPress={() => runSearch()} disabled={loading}>
         <Text style={styles.searchButtonText}>{loading ? "Searching…" : "Search"}</Text>
       </Pressable>
 

@@ -52,7 +52,7 @@ export function newSessionToken(): string {
 
 export async function suggestPlaces(
   query: string,
-  opts: { sessionToken: string; language?: string }
+  opts: { sessionToken: string; language?: string; types?: string }
 ): Promise<PlaceSuggestion[]> {
   if (!MAPBOX_TOKEN) return [];
   const url = `https://api.mapbox.com/search/searchbox/v1/suggest${qs({
@@ -60,6 +60,11 @@ export async function suggestPlaces(
     session_token: opts.sessionToken,
     access_token: MAPBOX_TOKEN,
     language: opts.language,
+    // Biases results toward precise street-level matches — used by the
+    // dedicated address-search sheet, which only ever wants an exact
+    // address, not the broader mix of places/POIs the general suggest
+    // call can return.
+    types: opts.types,
   })}`;
   const res = await fetch(url);
   if (!res.ok) return [];
