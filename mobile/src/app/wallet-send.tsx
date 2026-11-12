@@ -64,9 +64,16 @@ export default function WalletSendScreen() {
 
   if (balances.length === 0) {
     return (
-      <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
+      <View style={styles.container}>
         <SkyOceanBackground tone="pale" />
-        <Text style={styles.title}>Send Funds</Text>
+        <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+          <Pressable onPress={() => safeBack()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Send Funds</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.body}>
         <Text style={styles.empty}>Fund your wallet first — there&apos;s nothing to send yet.</Text>
         <DotOutline radius={radii.pill} tone="onLight" style={styles.buttonSpacing}>
           <Pressable style={styles.button} onPress={() => router.replace("/wallet-fund")}>
@@ -74,15 +81,23 @@ export default function WalletSendScreen() {
             <Ionicons name="arrow-forward" size={18} color={colors.primaryDark} />
           </Pressable>
         </DotOutline>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
+    <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={styles.title}>Send Funds</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Send Funds</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
+      <View style={styles.body}>
       <Text style={styles.label}>From currency</Text>
       <View style={styles.chipRow}>
         {balances.map((b) => (
@@ -147,13 +162,22 @@ export default function WalletSendScreen() {
           )}
         </Pressable>
       </DotOutline>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
-  title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.lg },
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   chip: {

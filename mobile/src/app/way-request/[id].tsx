@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { acceptWayRequest, declineWayRequest, getWayRequest } from "../../api/wayRequests";
 import type { DiscoveredVia, WayRequest } from "../../types";
 import { formatRelativeTime } from "../../lib/formatRelativeTime";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { safeBack } from "../../lib/navigation";
 
 const DISCOVERED_VIA_LABEL: Record<DiscoveredVia, string> = {
   nearby: "Found nearby",
@@ -21,6 +24,7 @@ const DISCOVERED_VIA_LABEL: Record<DiscoveredVia, string> = {
 export default function WayRequestReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [request, setRequest] = useState<WayRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
@@ -76,7 +80,15 @@ export default function WayRequestReviewScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={styles.title}>WAY Request</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>WAY Request</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.body}>
       <Text style={styles.subtitle}>
         {request.fromProfile?.displayName ?? "Someone"} ({request.fromProfile?.wayId}) wants to connect
       </Text>
@@ -125,6 +137,7 @@ export default function WayRequestReviewScreen() {
       {!isRecipient && request.status === "pending" && (
         <Text style={styles.notice}>Waiting for {request.toProfile?.displayName} to respond.</Text>
       )}
+      </View>
     </View>
   );
 }
@@ -137,9 +150,17 @@ function VideoAttachment({ uri }: { uri: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { ...typography.h2, color: colors.textPrimary },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   time: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   discoveredVia: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },

@@ -79,21 +79,31 @@ export default function WayRequestScreen() {
 
   if (sent) {
     return (
-      <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
+      <View style={styles.container}>
         <SkyOceanBackground tone="pale" />
-        <Text style={styles.title}>WAY Request sent</Text>
-        <Text style={styles.subtitle}>{toDisplayName} will see it in their requests.</Text>
-        <Pressable style={styles.button} onPress={() => safeBack()}>
-          <Text style={styles.buttonText}>Done</Text>
-        </Pressable>
+        <View style={[styles.body, { paddingTop: spacing.xl + insets.top }]}>
+          <Text style={styles.title}>WAY Request sent</Text>
+          <Text style={styles.subtitle}>{toDisplayName} will see it in their requests.</Text>
+          <Pressable style={styles.button} onPress={() => safeBack()}>
+            <Text style={styles.buttonText}>Done</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
+    <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={styles.title}>Send a WAY Request</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Send a WAY Request</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.body}>
       <Text style={styles.subtitle}>to {toDisplayName} ({toWayId})</Text>
 
       <View style={styles.textAreaWrap}>
@@ -146,12 +156,22 @@ export default function WayRequestScreen() {
           )}
         </Pressable>
       </DotOutline>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   title: { ...typography.h2, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg },
   textAreaWrap: {

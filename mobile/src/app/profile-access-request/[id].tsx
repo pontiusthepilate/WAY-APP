@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { acceptProfileAccessRequest, declineProfileAccessRequest, getProfileAccessRequest } from "../../api/profileAccessRequests";
 import type { ProfileAccessRequest } from "../../types";
 import { formatRelativeTime } from "../../lib/formatRelativeTime";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { safeBack } from "../../lib/navigation";
 
 export default function ProfileAccessRequestReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [request, setRequest] = useState<ProfileAccessRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
@@ -64,7 +68,15 @@ export default function ProfileAccessRequestReviewScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={styles.title}>Profile Access Request</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Profile Access Request</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.body}>
       <Text style={styles.subtitle}>
         {request.fromProfile?.displayName ?? "Someone"} ({request.fromProfile?.wayId}) wants full access to your
         profile
@@ -105,14 +117,23 @@ export default function ProfileAccessRequestReviewScreen() {
       {!isRecipient && request.status === "pending" && (
         <Text style={styles.notice}>Waiting for {request.toProfile?.displayName} to respond.</Text>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { ...typography.h2, color: colors.textPrimary },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   time: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   messageBox: { backgroundColor: colors.surfaceAlt, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.lg },

@@ -1,17 +1,21 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, typography } from "../../theme/theme";
 import { useSession } from "../../context/SessionContext";
 import { acceptCameraRequest, declineCameraRequest, getCameraRequest } from "../../api/remoteCamera";
 import type { RemoteCameraRequest } from "../../types";
 import { formatRelativeTime } from "../../lib/formatRelativeTime";
 import { SkyOceanBackground } from "../../components/SkyOceanBackground";
+import { safeBack } from "../../lib/navigation";
 
 export default function CameraRequestScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { activeProfile } = useSession();
+  const insets = useSafeAreaInsets();
   const [request, setRequest] = useState<RemoteCameraRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
@@ -64,7 +68,15 @@ export default function CameraRequestScreen() {
   return (
     <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={styles.title}>Camera Access Request</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Camera Access Request</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.body}>
       <Text style={styles.subtitle}>
         {request.fromProfile?.displayName ?? "Someone"} ({request.fromProfile?.wayId}) wants to see your camera
       </Text>
@@ -103,14 +115,23 @@ export default function CameraRequestScreen() {
       {!isRecipient && request.status === "pending" && (
         <Text style={styles.notice}>Waiting for {request.toProfile?.displayName} to respond.</Text>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { ...typography.h2, color: colors.textPrimary },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   time: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   messageBox: { backgroundColor: colors.surfaceAlt, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.lg },
