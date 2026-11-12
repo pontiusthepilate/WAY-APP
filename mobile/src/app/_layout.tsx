@@ -15,6 +15,7 @@ import { CometTrail } from "../components/CometTrail";
 import { OrbitDot } from "../components/OrbitDot";
 import { EdgeGlow } from "../components/EdgeGlow";
 import { GlobalNavPanel } from "../components/GlobalNavPanel";
+import { KeyboardDismissButton } from "../components/KeyboardDismissButton";
 import { colors } from "../theme/theme";
 import { MAPBOX_TOKEN } from "../api/config";
 
@@ -105,6 +106,9 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       {/* Only once there's a signed-in profile — before that (welcome, OTP,
           onboarding, create-profile) there's no app section to jump to. */}
       {activeProfile && <GlobalNavPanel />}
+      {/* Unlike GlobalNavPanel, this one is useful even pre-auth (OTP entry,
+          create-profile's text fields), so it isn't gated on activeProfile. */}
+      <KeyboardDismissButton />
     </>
   );
 }
