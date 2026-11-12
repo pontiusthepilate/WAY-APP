@@ -76,10 +76,17 @@ export default function WalletFundScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: spacing.xl + insets.top }]}>
+    <View style={styles.container}>
       <SkyOceanBackground tone="pale" />
-      <Text style={styles.title}>Fund Wallet</Text>
+      <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Fund Wallet</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
+      <View style={styles.body}>
       <Text style={styles.label}>Currency</Text>
       <View style={styles.chipRow}>
         {CURRENCIES.map((c) => (
@@ -139,13 +146,22 @@ export default function WalletFundScreen() {
           ? "You'll complete payment on Paystack's secure checkout page."
           : "This is a simulated top-up for testing — no real payment is charged yet."}
       </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.xl },
-  title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.lg },
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: { ...typography.h3, color: colors.textPrimary },
+  body: { flex: 1, paddingHorizontal: spacing.xl },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   chip: {
